@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  9, 1997
-### Revised: Apr 14, 2000
+### Revised: Dec  7, 2002
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imsetup version 20000414(IM141)";
+my $VERSION = "imsetup version 20021207(IM142)";
 
 $Prog = 'imsetup';
 
@@ -23,13 +23,13 @@ $Prog = 'imsetup';
 
 use File::Copy;
 use Sys::Hostname;
-use IM::Config qw(init_opt read_opt read_cfg help);
+use IM::Config qw(init_opt read_opt read_cfg use_cl no_sync help);
 use IM::Util;
 use IM::Address qw(extract_addr);
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
-	    $opt_fromdomain $opt_noharm $opt_help);
+	    $opt_fromdomain $opt_noharm $opt_usecl $opt_nosync $opt_help);
 
 ##
 ## Environments
@@ -41,23 +41,24 @@ my $alias = "Aliases";
 
 my $home = $ENV{'HOME'};
 my $address;
+my $username;
 my $mail = "Mail";
 my $news = "News";
-my $usecl  = "@im_usecl@";
-my $nosync = "@im_nosync@";
+my $usecl;
+my $nosync;
 my $src = "local";
+my $mailbox_style = "mbox";
 my $auth = "";
-my ($user, $host) = split(/\@/, $address);
+my($user, $host) = split(/\@/, $address);
 my $keep = 0;
 my $smtpserver = "localhost";
 
-my ($mhdir, $mhalias, $domain, $nntpservers);
+my($mhdir, $mhalias, $domain, $nntpservers);
 
-$EXPLANATION = "
-$Prog :: Setup command for IM series
-$VERSION
+$EXPLANATION = "$VERSION
+setup for IM
 
-Usage :: $Prog [options]
+Usage: $Prog [Options]
 ";
 
 @OptConfig = (
@@ -84,16 +85,18 @@ if ($opt_fromdomain =~ /\./) {
 } else {
     $address = im_getlogin() . "\@" . get_domain_name();
 }
+$usecl = use_cl() ? 'yes' : 'no';
+$nosync = no_sync() ? 'yes' : 'no';
 
 &read_conf();
 &check_im_directory();
 &make_conf_file();
 &copy_alias_file();
 
-sub get_domain_name () {
+sub get_domain_name() {
     my $hostname = hostname();
     unless ($hostname =~ /\./) {
-	my ($h) = gethostbyname($hostname);
+	my($h) = gethostbyname($hostname);
 	$hostname = $h if ($h);
     }
     $hostname =~ s/^[^.]+\.//;
@@ -101,7 +104,7 @@ sub get_domain_name () {
     return $hostname;
 }
 
-sub read_conf () {
+sub read_conf() {
     $home = &input_config("Where is your home directory?", $home);
     &scan_mh_conf();
 
@@ -112,7 +115,7 @@ sub read_conf () {
     do {
 	do {
 	    $mymail = &input_config("Where is your Mail directory?", $mymail);
-	} until (($mail = $mymail) =~ s!^$qhome/!!e
+	} until (($mail = $mymail) =~ s!^$qhome/!!
 		 || &input_confirm("Sure to use $mail which is not beneath "
 				   . "your home directory?"));
     } while (! &check_and_create_directory($mymail));
@@ -120,7 +123,7 @@ sub read_conf () {
     do {
 	do {
 	    $mynews = &input_config("Where is your News directory?", $mynews);
-	} until (($news = $mynews) =~ s!^$qhome/!!e
+	} until (($news = $mynews) =~ s!^$qhome/!!
 		 || &input_confirm("Sure to use $news which is not beneath "
 				   . "your home directory?"));
     } while (! &check_and_create_directory($mynews));
@@ -131,7 +134,14 @@ sub read_conf () {
         $src = &input_config("What kind of mail spool do you use? (local/POP/IMAP)", $src);
     } while (! ($src =~ /^local$|^pop$|^imap$/i));
   
+    if ($src =~ /^local/i) {
+	do {
+	    $mailbox_style = &input_config("What kind of mailbox style do you use? (mbox/maildir)", $mailbox_style);
+	} while (! ($mailbox_style =~ /^mbox$|^maildir$/i));
+    }
+
     if ($src =~ /^pop|^imap/i) {
+        my $a = extract_addr($address);
         if ($src =~ /^pop/i) {
             $auth = "POP";
             do {
@@ -143,7 +153,7 @@ sub read_conf () {
                 $auth = &input_config("What kind of IMAP authentication mechanism? (AUTH/LOGIN)", $auth);
             } while (! ($auth =~ /^auth$|^login$/i));
         }
-        ($user, $host) = split(/\@/, $address);
+        ($user, $host) = split(/\@/, $a);
         $host = "mail." . $host;
         $user = &input_config("What is your $src account name?", $user);
         $host = &input_config("What is your $src server name or IP address?", $host);
@@ -176,8 +186,8 @@ sub read_conf () {
     print "\n";
 }
 
-sub input_config ($$) {
-    my ($msg, $default) = @_;
+sub input_config($$) {
+    my($msg, $default) = @_;
     my $ret;
 
     print "$msg [$default] ";
@@ -187,7 +197,7 @@ sub input_config ($$) {
 }
 
 sub input_confirm($;$) {
-    my ($msg, $default) = @_;
+    my($msg, $default) = @_;
     my $ret;
 
     $default = "yes" if $default eq "";
@@ -198,11 +208,11 @@ sub input_confirm($;$) {
     return $ret =~ m/^y/i;
 }
 
-sub scan_mh_conf () {
+sub scan_mh_conf() {
     my $mh_profile = "$home/.mh_profile";
-    if ( -f $mh_profile ) {
+    if (-f $mh_profile) {
 	open(MH_PROFILE, $mh_profile);
-	while(<MH_PROFILE>) {
+	while (<MH_PROFILE>) {
 	    chomp;
 	    if (/^Path:\s*(.*)/i) {
 		$mhdir = $mail =  $1;
@@ -224,8 +234,8 @@ sub scan_mh_conf () {
     }
 }
 
-sub check_im_directory () {
-    if ( -x "$home/$imdir" ) {
+sub check_im_directory() {
+    if (-x "$home/$imdir") {
 	print "$home/$imdir is already exist.\n";
     } else {
 	if (!$opt_noharm) {
@@ -237,10 +247,10 @@ sub check_im_directory () {
     }
 }
 
-sub check_and_create_directory ($) {
+sub check_and_create_directory($) {
     my $dir = shift;
 
-    if ( ! -x $dir ) {
+    if (! -x $dir) {
 	if (&input_confirm("$dir does not exist. Create it?")) {
 	    print "Creating $dir directory.\n";
 	    if (!$opt_noharm) {
@@ -258,15 +268,15 @@ sub check_and_create_directory ($) {
     return 1;
 }
 
-sub copy_alias_file () {
+sub copy_alias_file() {
     my $im_alias = "$home/$imdir/$alias";
     my $mh_alias = "$home/$mhdir/$mhalias";
 
-    if ( ! -f $mh_alias ) {
+    if (! -f $mh_alias) {
 	$mh_alias = $mhalias;
     }
 
-    if ( -f $mh_alias && ! -f $im_alias ) {
+    if (-f $mh_alias && ! -f $im_alias) {
 	print "Copy $mh_alias to $im_alias.\n";
 	if (!$opt_noharm) {
 	    copy($mh_alias, $im_alias);
@@ -274,10 +284,10 @@ sub copy_alias_file () {
     }
 }
 
-sub make_conf_file () {
+sub make_conf_file() {
     my $im_config = "$home/$imdir/$config";
 
-    if ( -f $im_config ) {
+    if (-f $im_config) {
 	print "Backup $im_config to $im_config.bak.\n";
 	if (!$opt_noharm) {
 	    rename ("$im_config", "$im_config.bak");
@@ -287,9 +297,7 @@ sub make_conf_file () {
     print "Setup $im_config.\n";
     if (!$opt_noharm) {
 	my $a = extract_addr($address);
-	if ($a =~ /\@(.*)/) {
-	    $domain = $1;
-	}
+	($username, $domain) = split(/\@/, $a);
 	$nntpservers = $ENV{'NNTPSERVER'} || "localhost";
 	open(CONFIG, ">$im_config");
 	print CONFIG <<"---";
@@ -328,7 +336,7 @@ ToDomain=$domain
 				# should not contain 8bit characters
 #AddrRegex=
 #Org=The Mew Organization	# for news posting
-#User=user_name
+User=$username
 
 ##
 ## Default global parameters
@@ -360,6 +368,7 @@ NewsDir=$news			# for saved news
 
 ## Address Book
 #AddrBookFile=Addrbook		# relative to ~/.im/
+#AddrBookFile=\${HOME}/Mail/Addrbook	# if you share Addrbook with Mew 2
 ## Mail address aliases
 #AliasesFile=Aliases		# relative to ~/.im/
 ## PetName: mail address aliases for displaying
@@ -396,22 +405,31 @@ Smtpservers=$smtpserver
 #GetSbr=get.sbr			# hook for special processing (rel. to ~/.im/)
 ---
 
-        if ($src =~ /^local/i ) {
-            print CONFIG <<"---";
+	if ($src =~ /^local/i) {
+	    if ($mailbox_style =~ /^maildir/i) {
+		print CONFIG <<"---";
+MBoxStyle=qmail
+Imget.Src=local:\${HOME}/Maildir
+keep=$keep
+---
+	    } else {
+		print CONFIG <<"---";
 Imget.Src=local
 keep=$keep
 ---
-        }
+	    }
+	}
         print CONFIG <<"---";
 #Imget.Src=local		# default source of imget (local mailbox)
 #lock=flock			# locking style of local mailbox
 #rpath=append			# conversion of UNIX From into Return-Path:
 #PopHistory=pophist-{POPSERVERID}	# to save last state (relative to ~/.im/)
 #NntpHistory=newshist		# to save last state (relative to ~/.im/)
-#MBoxStyle=qmail		# if folder style mbox of qmail is used
-#Imget.Src=local:\${HOME}/MailDir# in case of qmail
+#MBoxStyle=qmail			# if folder style mbox of qmail is used
+#Imget.Src=local:\${HOME}/Maildir	# in case of qmail
 UseCL=$usecl			# Use value of Content-Length header
 NoSync=$nosync			# Do not need fsync(2) on writing file
+#FsyncNumber=118		# system call number of fsync
 
 ---
         if ($src =~ /^pop/i) {
@@ -446,13 +464,18 @@ keep=$keep
 #HttpProxy=proxy-server:8080	# proxy server for HTTP access
 #NoProxy=http://.*my.domain/	# URL regex not to use Proxy server
 #UsePwAgent=yes			# use password agent
-#PwAgentPort=6543		# Port to connect pwagent with TCP/IP
-				# (Insecure for multi-user system!)
-				# 0 to use UNIX domain socket (more secure)
+#PwAgentPort=0			# Port to connect pwagent with TCP/IP
+				# 0 to use UNIX domain socket
+				# NOTE: non-0 (e.g. 6543) is insecure
+				#       on multi-user system
+#PwAgentTmpDir=pwagtmp		# temporary directory (relative to ~/.im/)
 
 # be careful on security if you wish to use PwFiles!
 #UsePwFiles=yes			# use password files
 #PwFiles=password		# password files (relative to ~/.im/)
+
+#NamazuV2=yes			# use Namazu version 2 (1.9.x or late)
+#NamazuLockDir=nmzlock		# lock directory (relative to ~/.im/)
 
 ## imput specific
 #FccDir=\$MailDir		# directory for FCC folders
@@ -496,6 +519,48 @@ keep=$keep
 ---
     }
 }
+
+__END__
+
+=head1 NAME
+
+imsetup - setup for IM
+
+=head1 SYNOPSIS
+
+B<imsetup> [OPTIONS]
+
+=head1 DESCRIPTION
+
+The I<imsetup> command is a setup program for IM.
+
+This command is provided by IM (Internet Message).
+
+=head1 OPTIONS
+
+=over 5
+
+=item I<-f, --fromdomain=STRING>
+
+Default domain name for mail address.
+
+=item I<-n, --noharm={on,off}>
+
+Do execute setup, show what will be performed.
+
+=item I<-h, --help>
+
+Display help message and exit.
+
+=back
+
+=head1 COPYRIGHT
+
+IM (Internet Message) is copyrighted by IM developing team.
+You can redistribute it and/or modify it under the modified BSD
+license.  See the copyright file for more details.
+
+=cut
 
 ### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
