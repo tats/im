@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Apr 23, 2007
+### Revised: Feb 15, 2010
 ###
 
-my $PM_VERSION = "IM::Pop.pm version 20100215(IM150)";
+my $PM_VERSION = "IM::Pop.pm version 20110525(IM151)";
 
 package IM::Pop;
 require 5.003;

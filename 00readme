@@ -3,7 +3,7 @@
 			    Kazu Yamamoto
 			  Tatsuya Kinoshita
 
-			     Feb 15, 2010
+			     May 25, 2011
 
 
 			   <<<Copyright>>>
@@ -78,7 +78,7 @@ specify the "--prefix" option as follows:
 
 	% ./configure --prefix=/your/home
 
-The "--bindir", "--with-perldir", and "--libdir" option overrides for
+The "--bindir", "--with-perldir", and "--sysconfdir" option overrides for
 each. For instance, if you want install the IM perl modules to
 "/other/place/perl/IM", do as follows:
 

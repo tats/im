@@ -1,3 +1,10 @@
+		Differences between IM 151 and IM 150
+
+* Tiny changes for Perl 5.12.
+* Build scripts are updated.
+  - Use `sysconfdir' instead of `libdir' for the configuration file.
+  - $(DESTDIR) is prepended to each installed target.
+
 		Differences between IM 150 and IM 149
 
 * NamazuV2=yes by default.

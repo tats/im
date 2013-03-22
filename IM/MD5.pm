@@ -8,7 +8,7 @@
 ### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::MD5.pm version 20100215(IM150)";
+my $PM_VERSION = "IM::MD5.pm version 20110525(IM151)";
 
 package IM::MD5;
 require 5.003;

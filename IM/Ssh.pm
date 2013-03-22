@@ -9,7 +9,7 @@
 ### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::Ssh.pm version 20100215(IM150)";
+my $PM_VERSION = "IM::Ssh.pm version 20110525(IM151)";
 
 package IM::Ssh;
 require 5.003;

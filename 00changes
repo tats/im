@@ -1,3 +1,15 @@
+151 (2011/05/25)
+
+* IM/Config.pm.in, IM/Scan.pm: Don't use defined(%hash) for Perl 5.12.
+* Makefile.in, IM/Config.pm.in: Use `sysconfdir' instead of `libdir' for
+  the configuration file.
+* Makefile.in: $(DESTDIR) is prepended to each installed target.
+* impwagent.in, IM/Config.pm.in: Use tats@vega.ocn.ne.jp instead of
+  img@mew.org to report bugs.
+* config.guess, config.sub: Updated with Debian autotools-dev 20110511.1.
+* configure: Updated with Debian autoconf 2.68-1.
+* install-sh: Updated with Debian libtool 2.4-2.
+
 150 (2010/02/15)
 
 * IM/Pop.pm: Move exec_getsbrfile() from pop_repr() to pop_inc() to work
