@@ -628,8 +628,10 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 
-im_version="version 971024"
-im_revised="Oct 24, 1997"
+im_version="version 980506"
+im_revised="May 06, 1998"
+im_file_attr="O_RDWR|O_CREAT|O_EXCL"
+
 
 
 
@@ -640,7 +642,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:644: checking for $ac_word" >&5
+echo "configure:646: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'im_cv_path_im_path_perl'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -681,7 +683,7 @@ case "$im_path_perl" in
    exit 1
 esac
 echo $ac_n "checking for site_perl""... $ac_c" 1>&6
-echo "configure:685: checking for site_perl" >&5
+echo "configure:687: checking for site_perl" >&5
 if eval "test \"`echo '$''{'im_cv_path_im_path_siteperl'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -707,7 +709,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:711: checking for $ac_word" >&5
+echo "configure:713: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_im_path_chmod'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -744,7 +746,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:748: checking for $ac_word" >&5
+echo "configure:750: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_im_path_cp'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -781,7 +783,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:785: checking for $ac_word" >&5
+echo "configure:787: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_im_path_mkdir'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -818,7 +820,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:822: checking for $ac_word" >&5
+echo "configure:824: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_im_path_rm'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -851,7 +853,7 @@ done
 test -n "$im_path_rm" || im_path_rm="missing_rm"
 
 echo $ac_n "checking for DB type""... $ac_c" 1>&6
-echo "configure:855: checking for DB type" >&5
+echo "configure:857: checking for DB type" >&5
 if eval "test \"`echo '$''{'im_cv_perl_im_db_type'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -995,13 +997,13 @@ done
 ac_given_srcdir=$srcdir
 ac_given_INSTALL="$INSTALL"
 
-trap 'rm -fr `echo "imali:imali.in imcat:imcat.in imcd:imcd.in \
+trap 'rm -fr `echo "imali:imali.in imcat:imcat.in imcd:imcd.in imclean:imclean.in \
 	imget:imget.in imgrep:imgrep.in imhist:imhist.in \
-	imls:imls.in immv:immv.in \
+	imjoin:imjoin.in imls:imls.in immv:immv.in \
 	impack:impack.in impath:impath.in imput:imput.in \
 	impwagent:impwagent.in \
 	imrm:imrm.in imsetup:imsetup.in imsort:imsort.in \
-	imstore:imstore.in \
+	imstore:imstore.in imtar:imtar.in\
 	Makefile:Makefile.in \
 	IM/Address.pm:IM.in/Address.pm.in \
 	IM/Alias.pm:IM.in/Alias.pm.in \
@@ -1010,6 +1012,7 @@ trap 'rm -fr `echo "imali:imali.in imcat:imcat.in imcd:imcd.in \
 	IM/File.pm:IM.in/File.pm.in \
 	IM/Folder.pm:IM.in/Folder.pm.in \
 	IM/GetPass.pm:IM.in/GetPass.pm.in \
+	IM/Grep.pm:IM.in/Grep.pm.in \
 	IM/Header.pm:IM.in/Header.pm.in \
 	IM/History.pm:IM.in/History.pm.in \
 	IM/Http.pm:IM.in/Http.pm.in \
@@ -1026,8 +1029,8 @@ trap 'rm -fr `echo "imali:imali.in imcat:imcat.in imcd:imcd.in \
 	IM/Recipient.pm:IM.in/Recipient.pm.in \
 	IM/Scan.pm:IM.in/Scan.pm.in \
 	IM/Smtp.pm:IM.in/Smtp.pm.in \
-	IM/Stdio.pm:IM.in/Stdio.pm.in \
 	IM/TcpTransaction.pm:IM.in/TcpTransaction.pm.in \
+	IM/Util.pm:IM.in/Util.pm.in \
 	" | sed "s/:[^ ]*//g"` conftest*; exit 1' 1 2 15
 EOF
 cat >> $CONFIG_STATUS <<EOF
@@ -1069,6 +1072,7 @@ s%@im_version@%$im_version%g
 s%@im_revised@%$im_revised%g
 s%@im_rpop@%$im_rpop%g
 s%@im_db_type@%$im_db_type%g
+s%@im_file_attr@%$im_file_attr%g
 s%@im_path_perl@%$im_path_perl%g
 s%@im_path_siteperl@%$im_path_siteperl%g
 s%@im_path_chmod@%$im_path_chmod%g
@@ -1116,13 +1120,13 @@ EOF
 
 cat >> $CONFIG_STATUS <<EOF
 
-CONFIG_FILES=\${CONFIG_FILES-"imali:imali.in imcat:imcat.in imcd:imcd.in \
+CONFIG_FILES=\${CONFIG_FILES-"imali:imali.in imcat:imcat.in imcd:imcd.in imclean:imclean.in \
 	imget:imget.in imgrep:imgrep.in imhist:imhist.in \
-	imls:imls.in immv:immv.in \
+	imjoin:imjoin.in imls:imls.in immv:immv.in \
 	impack:impack.in impath:impath.in imput:imput.in \
 	impwagent:impwagent.in \
 	imrm:imrm.in imsetup:imsetup.in imsort:imsort.in \
-	imstore:imstore.in \
+	imstore:imstore.in imtar:imtar.in\
 	Makefile:Makefile.in \
 	IM/Address.pm:IM.in/Address.pm.in \
 	IM/Alias.pm:IM.in/Alias.pm.in \
@@ -1131,6 +1135,7 @@ CONFIG_FILES=\${CONFIG_FILES-"imali:imali.in imcat:imcat.in imcd:imcd.in \
 	IM/File.pm:IM.in/File.pm.in \
 	IM/Folder.pm:IM.in/Folder.pm.in \
 	IM/GetPass.pm:IM.in/GetPass.pm.in \
+	IM/Grep.pm:IM.in/Grep.pm.in \
 	IM/Header.pm:IM.in/Header.pm.in \
 	IM/History.pm:IM.in/History.pm.in \
 	IM/Http.pm:IM.in/Http.pm.in \
@@ -1147,8 +1152,8 @@ CONFIG_FILES=\${CONFIG_FILES-"imali:imali.in imcat:imcat.in imcd:imcd.in \
 	IM/Recipient.pm:IM.in/Recipient.pm.in \
 	IM/Scan.pm:IM.in/Scan.pm.in \
 	IM/Smtp.pm:IM.in/Smtp.pm.in \
-	IM/Stdio.pm:IM.in/Stdio.pm.in \
 	IM/TcpTransaction.pm:IM.in/TcpTransaction.pm.in \
+	IM/Util.pm:IM.in/Util.pm.in \
 	"}
 EOF
 cat >> $CONFIG_STATUS <<\EOF
@@ -1213,8 +1218,9 @@ cat >> $CONFIG_STATUS <<EOF
 
 EOF
 cat >> $CONFIG_STATUS <<\EOF
-chmod 555 imali imcat imcd imget imgrep imhist \
-	imls immv impack impath imput impwagent imrm imsetup imsort imstore
+chmod 555 imali imcat imcd imclean imget imgrep imhist imjoin\
+	imls immv impack impath imput impwagent imrm imsetup imsort imstore\
+	imtar
 exit 0
 EOF
 chmod +x $CONFIG_STATUS

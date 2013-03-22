@@ -20,10 +20,10 @@ package IM::Scan;
 require 5.003;
 require Exporter;
 
-use IM::Config;
-use IM::EncDec;
-use IM::Address;
-use IM::Stdio;
+use IM::Config qw(allowcrlf scansbrfile mail_path address addresses_regex);
+use IM::Util;
+use IM::EncDec qw(mime_decode_string);
+use IM::Address qw(extract_addr fetch_addr);
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -58,7 +58,7 @@ use vars qw(@ISA @EXPORT);
   MailDir:      your mail directory             Mail
   Width:        one line width                  80
   JisSafe:      safely substr for ISO-2022-JP   on
-  Form:         scan format                     %5n %m%d %8f %-30S %b
+  Form:         scan format                     %+5n %m%d %8f %-30S %b
   PetnameFile:  nickname file			~/.im/Petname
   Address:      your mail addresses             kazu@mew.org, kazu@wide.ad.jp
   AddrRegex:    regexp of your addresses        ^kazu@.*$
@@ -79,7 +79,7 @@ use vars qw(@ISA @EXPORT);
 	    or raw Newsgroups: is displayed in 'To:xxx' or 'Ng:xxx' 
 	    format, respectively. Otherwise, friendly From: field is 
 	    displayed.
-      %P    Similar to %A, but diplay row address of mail sender
+      %P    Similar to %A, but diplay raw address of mail sender
             instead of friendly From: field, just like mh-e.            
       %i    indent to display thread
       %s    MIME decoded Subject: field
@@ -112,7 +112,7 @@ use vars qw(@ISA @EXPORT);
   to process other header-types with JIS version of 'substr', specify '!'
   just after '%' like: %!-8S.
 
-  ScanForm "%5n %m%d %-14A %-18S %b" works as same as IM default scaning.
+  ScanForm "%+5n %m%d %-14A %-18S %b" works as same as IM default scaning.
 
 =head1 PETNAMES FORMAT
 
@@ -158,7 +158,7 @@ BEGIN {
 
     # used in 'set_scan_form' to convert scan_form() to $EVAL_SCAN_FORM
     %symbol_table = (
-		     'n' => 'number',
+		     'n' => 'number:',
 		     'd' => 'date:',
 		     'f' => 'from:',
 		     't' => 'to:',
@@ -171,7 +171,7 @@ BEGIN {
 		     'b' => 'body:',
 		     'm' => 'multipart:',
 		     'S' => 'indent-subject:',
-		     'F' => 'folder',
+		     'F' => 'folder:',
 		     'M' => 'mark:',
 		     'p' => 'private:',
 		     'D' => 'duplicate:',
@@ -244,11 +244,12 @@ sub get_header ($) {
     $Head{'path'} = $path;
     if ($path =~ /(.*)\/([0-9]+)$/) {
 	# xxx how about news?
-	$Head{'number'} = $2;
-	$Head{'folder'} = '+' . substr($1, length(mail_path()) + 1);
+	$Head{'number:'} = $2;
+	$Head{'folder:'} = '+' . substr($1, length(mail_path()) + 1);
     }
 
     open(MSG, "<$path") || return;
+    binmode(MSG);
 
     ##
     ## Collect file attributes
@@ -483,7 +484,8 @@ sub parse_header ($) {
     ## Mark
     ##
     $href->{'multipart:'} = ' ';
-    if (defined($href->{'content-type'}) &&
+    if (defined($href->{'mime-version'}) &&
+	defined($href->{'content-type'}) &&
 	$href->{'content-type'} =~ /Multipart\/(...)/i) {
 	$href->{'multipart:'} = $multipart_mark{lc($1)} || 'M';
     }
@@ -569,7 +571,7 @@ sub disp_msg ($;$) {
 	$content =~ s/\t/ /g;
 	if ($vscan) {
 	    print &substr_safe($content, $WIDTH - 1),
-	    "\r $href->{'folder'} $href->{'pnum'}\n";
+	    "\r $href->{'folder:'} $href->{'pnum'}\n";
 	} else {
 	    print &substr_safe($content, $WIDTH - 1), "\n";
 	}
@@ -619,17 +621,17 @@ sub my_addr (@) {
     my $addr;
 
     unless (defined($ADDRESS_HASH{'init'})) {
-	$ADDRESS_HASH{'addr'} = &addresses_regex();
+	$ADDRESS_HASH{'addr'} = addresses_regex();
 	unless ($ADDRESS_HASH{'addr'}) {
-	    $ADDRESS_HASH{'addr'} = '^' . &address() . '$';
-	    $ADDRESS_HASH{'addr'} =~ s/\s*,\s*/|/g;
+	    $ADDRESS_HASH{'addr'} = '^' . quotemeta(address()) . '$';
+            $ADDRESS_HASH{'addr'} =~ s/(\\\s)*\\,(\\\s)*/|/g;
 	}
 	    $ADDRESS_HASH{'init'} = 1;
     }
     return 0 if ($ADDRESS_HASH{'addr'} eq "");
     foreach $addr (@addrs) {
 	my $a;
-	while (($a, $addr) = &fetch_addr($addr, 1), $a ne "") {
+	while (($a, $addr) = fetch_addr($addr, 1), $a ne "") {
 	    return 1 if ($a =~ /$ADDRESS_HASH{'addr'}/io);
 	}
     }
@@ -780,13 +782,23 @@ sub substr_safe ($$) {
 	# for Japanese Character in rfc1554
 	elsif (s/(^\e\(B)//)	{ $G0 = $charset = 'ascii'; }
 	elsif (s/(^\e\$\@)//)	{ $G0 = $charset = 'jisx0208-1978'; }
-	elsif (s/(^\e\$B)//)	{ $G0 = $charset = 'jisx0208-1983'; }
+	elsif (s/(^\e\$\(?B)//)	{ $G0 = $charset = 'jisx0208-1983'; }
 	elsif (s/(^\e\(J)//)	{ $G0 = $charset = 'jisx0201-roman'; }
-	elsif (s/(^\e\$A)//)	{ $G0 = $charset = 'gb2312-1980'; }
+	elsif (s/(^\e\$\(?A)//)	{ $G0 = $charset = 'gb2312-1980'; }
 	elsif (s/(^\e\$\(D)//)	{ $G0 = $charset = 'jisx0212-1990'; }
 	elsif (s/(^\e\$\(C)//)	{ $G1 = $charset = 'ksc5601-1987';
 				  $G0 = 'ascii'; }
 
+	elsif (s/(^\e-A)//)	{ $G1 = $charset = 'iso8859-1'; }
+	elsif (s/(^\e-B)//)	{ $G1 = $charset = 'iso8859-2'; }
+	elsif (s/(^\e-C)//)	{ $G1 = $charset = 'iso8859-3'; }
+	elsif (s/(^\e-D)//)	{ $G1 = $charset = 'iso8859-4'; }
+	elsif (s/(^\e-L)//)	{ $G1 = $charset = 'iso8859-5'; }
+	elsif (s/(^\e-G)//)	{ $G1 = $charset = 'iso8859-6'; }
+	elsif (s/(^\e-F)//)	{ $G1 = $charset = 'iso8859-7'; }
+	elsif (s/(^\e-H)//)	{ $G1 = $charset = 'iso8859-8'; }
+	elsif (s/(^\e-M)//)	{ $G1 = $charset = 'iso8859-9'; }
+	   
 	elsif (s/(^\e\.A)//)	{ $G2 = $charset = 'iso8859-1'; }
 	elsif (s/(^\e\.F)//)	{ $G2 = $charset = 'iso8859-7'; }
 

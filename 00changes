@@ -1,3 +1,218 @@
+91 (98/05/06) mew-dist release
+
+* RcvBufSiz is now customizable. 
+	"SAKANAKA, Tatsumi" <sakanaka@tokyo-gas.co.jp>
+* Many timeout values are now customizable. 
+	Shigechika AIKAWA <shige@cin.nihon-u.ac.jp>
+* imtar.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* A patch to make imsetup incorporated with IMAPAccount.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Fcc bug fix.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* DB bug fix.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* list:; bug fix.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+
+90 (98/04/07) mew-dist release
+
+* Version patch for imjoin.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* fsync patch.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* impath displays ConfigCases.
+
+89  (98/04/07) mew-dist release
+
+* if getlogin returns root, use getpwuid instead.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Delete a null file when file system is full.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Fix $| problem.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+	oota@LSi.nec.co.jp
+* immv creats folders if not exist.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* not-for-mail patch
+	Masachika ISHIZUKA <ishizuka@ish.org>
+
+88 (98/04/06) img release
+
+* binmode() for imcat.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* Some imput fixes.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Ignore PostPet. (for April fool joke)
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Japanese string grep.
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+* Bug fix for boundary skip.
+* Null value bug fix.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* ctext hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+87 (98/03/02) mew-dist release
+* binmode patch for imcat.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* substr_safe patch.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* EUC_JP & Shift_JIS support.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Unfolding patch for encoded lines.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* IMAP patch.
+	wkenji@flab.fujitsu.co.jp
+* Several bug fix patches.
+	Hideyuki SHIRAI <Shirai@rdmg.mgcs.mei.co.jp>
+
+86 (98/02/19) img release
+
+* impath prints ImapAccount.
+* ctext hack for iso-8859-?, cn-gb, euc-kr.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Don't GetPass unless IMAP.
+	Yuuichi Teranishi <teranisi@isl.ntt.co.jp>
+
+85 (98/02/10) mew-dist release
+
+* EUC speed up patch.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* imjoin for message/partial.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Never load History.pm unless required.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Timestamp hack for imput.
+	Mito <mit@nines.nec.co.jp>
+* Buf fix for --assoc of imget.
+	Ian Fraser <ianf@ind.tansu.com.au>
+* Default value for QueueDir.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* timezone support.
+	IMAZU Hideyo <himazu@ms.com>
+* MsgDB for Win NT.
+	Shuichi Kitaguchi <shuuic-k@is.aist-nara.ac.jp>
+* The new configure.cmd.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* Some alias fixes.
+	Murata Takashi <Takashi.Murata@nsgnet.co.jp>
+* metaquote for alias, again.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+84 (98/01/28) mew-dist release
+
+* configure replaces @im_file_attr@ to O_RDWR|O_CREAT|O_EXCL.
+* impath --path returns queue_path().
+* queue_path().
+* metaquote for alias.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* SDBM support.
+	Hideyuki SHIRAI <Shirai@rdmg.mgcs.mei.co.jp>
+* IMAP bug fix.
+	Yuuichi Teranishi <teranisi@isl.ntt.co.jp>
+* --ignorecase -> --casefold
+	"YAMAGUCHI, Shuhei" <yamagus@kw.netlaputa.ne.jp>
+* Require folder_mode in Folder.pm.
+	INOUE Hiroyuki <ino@ccs.co.jp>
+
+83 (98/01/19) mew-dist release
+
+* IMAP & imget hack.
+	Yuuichi Teranishi <teranisi@isl.ntt.co.jp>
+* filter patch for Win32.
+	Shuichi Kitaguchi <shuuic-k@is.aist-nara.ac.jp>
+* typo fix.
+	Shirai@rdmg.mgcs.mei.co.jp
+* IMAP fix for immv and imrm.
+	Hajimu UMEMOTO <ume@iabs.hitachi.co.jp>
+* NoSync msg.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* bug fix for ObeyMTAdomain=yes.
+	Masahiro MURATA <muse@ba2.so-net.or.jp>
+* imget fix.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Another imget fix.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* imsetup fsync patch.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Logic reverse patch.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+82 (98/01/14) mew-dist release
+
+* several patches for fsync.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* imali patch.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Jumbo patch for IMAP loading and Util.pm.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* imhist patch.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+
+81 (98/01/10) img release
+
+* Clean up options.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Bug fix for "Subject: 0".
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* OS2/configure.cmd patch.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+
+80 (97/12/25) mew-dist release
+
+* imget -q patch.
+	Yoshiaki KATAYAMA <katayama@arc.isl.melco.co.jp>
+* $ADDRESS_HASH{'addr'} hack.
+	Masahiro MURATA <muse@ba2.so-net.or.jp>
+* IMAP support.
+	wkenji@flab.fujitsu.co.jp
+* MMDF null line hack.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Makefile hack.
+	NAKAJI Hiroyuki <nakaji@zeisei.dpri.kyoto-u.ac.jp>
+* Alias is now case-insensitive.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+* {B,Q}_encode -> {b,q}_encode.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+* meta quote patch.
+	SAITO Tetsuya <tetuya-s@is.aist-nara.ac.jp>
+
+79 (97/12/15) mew-dist release
+
+* Explicitly ignores --debug=off.
+* /^yes|on|true|1$/i) -> /^(yes|on|true|1)$/i).
+* Don't mark with 'M' unless MIME-Version exists.
+* Fix to number: field.
+	Fumitoshi UKAI <ukai@jp.hpl.hp.com>
+* A patch to imsetup.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+* Appropriate abbreviation option hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+* %b fix.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+* Typo fix.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+
+78
+
+* Config priority.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+* OS2/configure.cmd patch
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* ad-hoc definition of alarm_func to die somehow.
+
+77 (97/11/06) img release
+
+* Grep.pm.
+	yamagus@kw.netlaputa.or.jp (YAMAGUCHI, Shuhei)
+* imclean.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+* '+' for default scan form.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+* login_name() -> im_getlogin().
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp> 
+
 76 (97/10/25) mew-release release
 
 * s -> s@ for MultipartAdd of imput.
@@ -71,7 +286,7 @@
 * BADFREE hack for im.cmd.
 	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
 * New configure.el and config-def.el
-	"YAMAGUCHI, Shuhei" <yamagus@alpha.co.jp>
+	yamagus@kw.netlaputa.or.jp (YAMAGUCHI, Shuhei)
 * New imsort.in.
 	"Takashi P.KATOH" <p-katoh@shiratori.riec.tohoku.ac.jp>
 * FCC: bug fix for imput .
@@ -79,7 +294,7 @@
 * imsort mode patch.
 	"Takashi P.KATOH" <p-katoh@shiratori.riec.tohoku.ac.jp>
 * configure.el patch and config-def.el.
-	"YAMAGUCHI, Shuhei" <yamagus@alpha.co.jp>
+	yamagus@kw.netlaputa.or.jp (YAMAGUCHI, Shuhei)
 * Yet another summer time patch.
 	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
 
@@ -96,9 +311,9 @@
 * A patch to prevent "no messages" for IMAP.
 	wkenji@flab.fujitsu.co.jp
 * A patch to configure.el.
-	"YAMAGUCHI, Shuhei" <yamagus@alpha.co.jp>
+	"yamagus@kw.netlaputa.or.jp (YAMAGUCHI, Shuhei)
 * Removed foo{IO} for Win32.
-	"YAMAGUCHI, Shuhei" <yamagus@alpha.co.jp>
+	"yamagus@kw.netlaputa.or.jp (YAMAGUCHI, Shuhei)
 * Miscellaneous patches.
 	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
 * MD5.pm patch.
@@ -117,7 +332,7 @@
 * help patch.
 	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
 * win32p -> win95p in imput.
-	"YAMAGUCHI, Shuhei" <yamagus@alpha.co.jp>
+	"yamagus@kw.netlaputa.or.jp (YAMAGUCHI, Shuhei)
 * impwagent patch.
 	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
 

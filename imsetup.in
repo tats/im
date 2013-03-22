@@ -24,8 +24,9 @@ $Prog = 'imsetup';
 
 use File::Copy;
 use Sys::Hostname;
-use IM::Config;
-use IM::Address;
+use IM::Config qw(init_opt read_opt help);
+use IM::Util;
+use IM::Address qw(extract_addr);
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig $opt_noharm $opt_help);
@@ -39,9 +40,11 @@ my $config = "Config";
 my $alias = "Aliases";
 
 my $home = $ENV{'HOME'};
-my $address = login_name() . "\@" . &get_domain_name();
+my $address = im_getlogin() . "\@" . &get_domain_name();
 my $mail = "Mail";
 my $news = "News";
+my $usecl = "no";
+my $nosync = "no";
 
 my ($mhdir, $mhalias, $domain, $nntpservers);
 
@@ -91,11 +94,12 @@ sub read_conf () {
 
     my $mymail = "$home/$mail";
     my $mynews = "$home/$news";
+    my $qhome = quotemeta($home);
 
     do {
 	do {
 	    $mymail = &input_config("Where is your Mail directory?", $mymail);
-	} until (($mail = $mymail) =~ s!^$home/!!e
+	} until (($mail = $mymail) =~ s!^$qhome/!!e
 		 || &input_confirm("Sure to use $mail which is not beneath "
 				   . "your home directory?"));
     } while (! &check_and_create_directory($mymail));
@@ -103,12 +107,24 @@ sub read_conf () {
     do {
 	do {
 	    $mynews = &input_config("Where is your News directory?", $mynews);
-	} until (($news = $mynews) =~ s!^$home/!!e
+	} until (($news = $mynews) =~ s!^$qhome/!!e
 		 || &input_confirm("Sure to use $news which is not beneath "
 				   . "your home directory?"));
     } while (! &check_and_create_directory($mynews));
 
     $address = &input_config("What is your E-mail address(es)?", $address);
+
+    $usecl = &input_config("Do you want to use value of Content-Length"
+			   . " header for delimitation for local\nmail?"
+			   . " (Answer yes if your OS supports Content-Length"
+			   . " header like Solaris 2.x,\notherwise answer no.)"
+			   , $usecl);
+
+    $nosync = &input_config("Does your system can detect write errors without"
+			    . " fsync(2)? (You can answer yes,\n"
+			    . "if your home directory is on local file system,"
+			    . " otherwise answer no.)"
+			    , $nosync);
 
     print "\n";
 }
@@ -215,7 +231,7 @@ sub make_conf_file () {
 
     print "Setup $im_config.\n";
     if (!$opt_noharm) {
-	my $a = &extract_addr($address);
+	my $a = extract_addr($address);
 	$a =~ /\@/;
 	$domain = $';
 	$nntpservers = $ENV{'NNTPSERVER'} || "localhost";
@@ -303,7 +319,7 @@ NewsDir=$news			# for saved news
 
 ## imget/imls specific
 #ScanSbr=scan.sbr		# hook for special processing (rel. to ~/.im/)
-#Form=%5n %m%d %-14A %-18S %b	# default format for scanning
+#Form=%+5n %m%d %-14A %-18S %b	# default format for scanning
 #AllowCRLF=no			# saved messages may contain CRLF (DOS style)
 #Width=80			# default width for scanning
 #JisSafe=on			# escape seq. of JIS char. should be managed
@@ -323,6 +339,8 @@ NewsDir=$news			# for saved news
 #NntpHistory=newshist		# to save last state (relative to ~/.im/)
 #MBoxStyle=qmail		# if folder style mbox of qmail is used
 #Imget.Src=local:\${HOME}/MailDir# in case of qmail
+#UseCL=$usecl			# Use value of Content-Length header
+#NoSync=$nosync			# Do not need fsync(2) on writing file
 
 #PopAccount=/APOP\@localhost	# account info for POP access
 #PopAccount=user/APOP\@host	# account info with user name
@@ -330,9 +348,10 @@ NewsDir=$news			# for saved news
 #Keep=7		 		# preserve read messages on server
 #ProtoKeep=UIDL			# how to know which message is unread
 				# (UIDL, LAST, STATUS, MSGID)
+#IgnorePostPet=yes		# leave messages for PostPet on mbox (POP only)
 
-#ImapAccount=\@localhost/AUTH	# account info for IMAP access
-#ImapAccount=user\@host/AUTH	# account info with user name
+#ImapAccount=/AUTH\@localhost	# account info for IMAP access
+#ImapAccount=user/AUTH\@host	# account info with user name
 #HttpProxy=proxy-server:8080	# proxy server for HTTP access
 #NoProxy=http://.*my.domain/	# URL regex not to use Proxy server
 #UsePwAgent=yes			# use password agent
@@ -346,6 +365,7 @@ NewsDir=$news			# for saved news
 
 ## imput specific
 #FccDir=\$MailDir		# directory for FCC folders
+#QueueDir=queue			# directory for to store messages to be sent
 #MsgIdDomain=\${HOST}		# if you want to use FQDN of dispatching host
 #ObeyMTAdomain=yes		# do not append domainpart to addresses by imput
 #NoMsgIdForNews=yes		# do not insert Message-Id: when posting as news

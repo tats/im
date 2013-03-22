@@ -21,8 +21,9 @@ require 5.003;
 require Exporter;
 
 use Fcntl;
-use IM::Config;
+use IM::Config qw(nntphistoryfile nntpservers nntp_timeout);
 use IM::TcpTransaction;
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -206,7 +207,7 @@ sub nntp_head_as_string ($) {
     }
     $count++;
     my ($found, $f) = (0, '');
-    alarm(20) unless win95p();
+    alarm(nntp_timeout()) unless win95p();
     $! = 0;
     while (<NNTPd>) {
 	unless (win95p()) {
@@ -242,7 +243,7 @@ sub nntp_head ($$) {
 	}
 	$count++;
 	my ($found, $f) = (0, '');
-	alarm(20) unless win95p();
+	alarm(nntp_timeout()) unless win95p();
 	$! = 0;
 	while (<NNTPd>) {
 	    unless (win95p()) {
@@ -313,7 +314,7 @@ sub nntp_article ($) {
 	return (-1, '');
     }
     my @Article = ();
-    alarm(20) unless win95p();
+    alarm(nntp_timeout()) unless win95p();
     $! = 0;
     while (<NNTPd>) {
 	unless (win95p()) {
@@ -448,7 +449,7 @@ sub nntp_get_msg ($$$$) {
     my ($servers, @servers);
 
     if ($src =~ /^nntp:(.*)/i || $src =~ /^news:(.*)/i) {
-	($group, $servers) = &nntp_spec($1);
+	($group, $servers) = &nntp_spec($1, nntpservers());
 	@servers = split(',', $servers);
     } else {
 	im_warn("no news group specified ($src).\n");
@@ -548,7 +549,7 @@ sub nntp_get_msg ($$$$) {
 		im_warn("can not get articles.\n");
 		return -1;
 	    }
-	    im_info("$msgs messages(s).\n");
+	    im_info("$msgs message(s).\n");
 	} else {
 	    im_info("no messages in $group at $servers.\n");
 	}
@@ -561,16 +562,15 @@ sub nntp_get_msg ($$$$) {
 }
 
 # News group (-group[@server])
-sub nntp_spec ($) {
-    my $spec = shift;
-    my ($group, $server);
+sub nntp_spec ($$) {
+    my ($spec, $server) = @_;
+    my $group;
 
     if ($spec =~ /([^@]*)\@(.*)/) {
 	$group = $1;
 	$server = $2;
     } else {
 	$group = $spec;
-	$server = &nntpservers();
     }
     return ($group, $server);
 }

@@ -112,4 +112,6 @@
 	--assoc=<string>一回の起動で複数の取り込み処理を行いたい場合に
 			指定する。区切りには ; を用いる。例:
 			=mail=nntp:fj.mail.system.sendmail;=mail=nntp:fj.mail
-
+	--ignorepostpet=<sw> PostPet クライアントが受信すべきメールを get せ
+			ず、サーバ側のメールボックスに残します。POP を利用し
+			ている場合にのみ意味を持ちます。

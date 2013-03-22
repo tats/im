@@ -1,0 +1,122 @@
+#! @im_path_perl@
+################################################################
+###
+###				imtar
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 08, 1998
+### Revised: @im_revised@
+###
+
+my $VERSION = "imtar @im_version@";
+
+$Prog = 'imtar';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Folder;
+use IM::Util;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_src $opt_dst $opt_noharm $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+$Prog :: compress folder into a single file.
+$VERSION
+
+usage: $Prog [options] [+folder]
+";
+
+@OptConfig =(
+    'src;F;;'     => "Set source folder.",
+    'dst;s;./msgbox;' => "Destination MMDF file.",
+    'noharm;b;;'  => "No operation. Show what will happen.",
+    'verbose;b;;' => 'With verbose messages.',
+    'debug;d;;'   => "With debug message.",
+    'help;b;;'    => "Show this message.",
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+
+my @msgs = @ARGV;
+@msgs = ('all') if (!@ARGV);
+
+$opt_dst = "stdout" if ($opt_noharm);
+make_mmdf($opt_src, $opt_dst, \@msgs);
+exit $EXIT_SUCCESS;
+
+##################################################
+##
+## Work horse
+##
+sub make_mmdf ($$$) {
+    my ($src, $dst, $msgs) = @_;
+    my $msg;
+    my @msg_paths;
+
+    @msg_paths = get_impath($src, @{$msgs});
+
+    if ($dst eq "stdout") {
+        binmode(stdout);
+    } else {
+        if (open(MMDF,">>$dst")) {
+            binmode(MMDF);
+            select MMDF;   # xxx
+        } else {
+            im_die("cannot open $dst\n");
+        }
+    }
+    foreach (@msg_paths){
+        $msg = $_;
+        &open_msg($msg);
+    }
+    close(MMDF) if ($dst ne "stdout");
+    print stderr "done\n" unless $opt_noharm;
+}
+
+sub open_msg ($) {
+    my $msg = $_;
+    my $mmdf_delimiter="\001\001\001\001";
+    if (open(MSG, "<$msg")) {
+        binmode(MSG);
+        print "$mmdf_delimiter\n";
+        print while(<MSG>);
+        print "$mmdf_delimiter\n";
+        close(MSG);
+    } else {
+        im_die("cannot open $msg\n");
+    }
+}
+
+
+### Local Variables:
+### mode: perl
+### End:

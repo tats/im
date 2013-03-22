@@ -26,6 +26,7 @@ require 5.003;
 use Socket;
 use IM::Config;
 use IM::GetPass;
+use IM::Util;
 
 ##
 ## Main
@@ -86,7 +87,7 @@ if ($res eq 'PONG') {
 }
 
 # preparing socket directory
-my $realuser = login_name();
+my $realuser = im_getlogin();
 unless ($realuser) {
     print STDERR "$Prog: can not get login name.\n";
     exit 1;

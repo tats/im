@@ -21,11 +21,11 @@ require 5.003;
 require Exporter;
 
 use IM::Config;
+use IM::Util;
 use IM::TcpTransaction;
 use IM::GetPass;
 use IM::MD5;
 use IM::MsgStore;
-use IM::Stdio;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -97,7 +97,7 @@ sub pop_open ($$$$) {
 	    im_warn("login failed ($resp).\n");
 	    return -1;
 	}
-	my $realuser = login_name();
+	my $realuser = im_getlogin();
 	$resp =  &send_command(\*POPd, "RPOP $realuser", "");
 	if ($resp !~ /^\+/) {
 	    im_warn("invalid password ($resp).\n");
@@ -153,7 +153,7 @@ sub pop_retr ($$) {
 	im_warn("RETR command failed.\n");
 	return -1;
     }
-    alarm(20) unless win95p();
+    alarm(pop_timeout()) unless win95p();
     $! = 0;
     while (<POPd>) {
 	unless (win95p()) {
@@ -189,7 +189,7 @@ sub pop_head ($) {
     local ($_);
     my (%head);
     undef %head;
-    alarm(20) unless win95p();
+    alarm(pop_timeout()) unless win95p();
     $! = 0;
     while (<POPd>) {
 	unless (win95p()) {
@@ -243,7 +243,7 @@ sub pop_uidl ($) {
 	im_warn("UIDL command failed.\n");
 	return -1;
     }
-    alarm(20) unless win95p();
+    alarm(pop_timeout()) unless win95p();
     $! = 0;
     while (<POPd>) {
 	unless (win95p()) {
@@ -357,16 +357,16 @@ sub pop_process ($$$) {
 		    }
 		}
 		if ($new > 0) {
-		    im_msg("$new new message(s) at $host.\n");
+		    im_info("$new new message(s) at $host.\n");
 		} else {
-		    im_msg("no new message at $host.\n");
+		    im_info("no new message at $host.\n");
 		}
 	    } else {
-		im_msg("$msgs message(s) at $host.\n");
+		im_info("$msgs message(s) at $host.\n");
 		$new = $msgs;
 	    }
 	} else {
-	    im_msg("no message at $host.\n");
+	    im_info("no message at $host.\n");
 	}
     } elsif ($how eq 'from') {
 	if ($msgs > 0) {
@@ -447,6 +447,13 @@ sub pop_inc ($$$$$$$) {
 
     im_info("Getting new messages into $dst....\n");
     for ($i = $last; $i <= $msgs; $i++) {
+	if ($main::opt_ignorepostpet) {
+	    $head = &pop_head($i);
+	    if ($head->{'x-mailer'} =~ /PostPet/i
+	     && $head->{'content-type'} =~ /multipart.+kiritorisen/i) {
+		next;
+	    }
+	}
 	if ($main::opt_keep != 0) {
 	    if ($keep_proto eq 'UIDL') {
 		if ($$uidlp[$i] eq '') {
@@ -466,7 +473,7 @@ sub pop_inc ($$$$$$$) {
 		}
 		$$histp{$$uidlp[$i]} = $accesstime;
 	    } elsif ($keep_proto eq 'STATUS' || $keep_proto eq 'MSGID') {
-		$head = &pop_head($i);
+		$head = &pop_head($i) unless ($main::opt_ignorepostpet);
 		my $mid = $head->{'message-id'};
 		next if ($mid eq '');
 		$mid =~ s/.*<(.*)>.*/$1/;
@@ -564,7 +571,7 @@ sub pop_spec ($) {
 	$spec = $s if ($s ne '');
     }
     my ($auth, $host) = ('apop', 'localhost');
-    my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || login_name();
+    my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || im_getlogin();
 
     while ($spec ne '') {
 	if ($spec =~ /^:([^:\/\@]+)(.*)/) {

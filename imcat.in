@@ -23,6 +23,7 @@ $Prog = 'imcat';
 ##
 
 use IM::Config;
+use IM::Util;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @EnvConfig @OptConfig
@@ -73,10 +74,11 @@ my $msg = $ARGV[0];
 unless ($msg) {
     im_die("no message specified.\n");
 }
+binmode(stdout);
 
 if ($msg =~ /^http:/i) {
-    require IM::Http && import IM::Http;
-    my ($rc, $data) = http_process($msg);
+    require IM::Http && import IM::Http qw(http_process);
+    my ($rc, $data) = http_process($msg, httpproxy(), noproxy());
     if ($rc < 0) {
 	im_die("can't access to message $msg.\n");
     }
@@ -85,18 +87,18 @@ if ($msg =~ /^http:/i) {
     }
 } elsif ($opt_src =~ /^[+=]/) {
     # Mail/News folder
-    require IM::Folder && import IM::Folder;
+    require IM::Folder && import IM::Folder qw(message_name);
 
-#   if ($msg =~ /<.*>/) {
     if ($msg =~ /\@/) {
-	require IM::History && import IM::History;
+	require IM::History &&
+	    import IM::History qw(history_open history_lookup history_close);
 
-	if (open_history(0) < 0) {
+	if (history_open(0) < 0) {
 	    im_die("can not open history.\n");
 	    exit $EXIT_ERROR;
 	}
-	my $msg = lookup_history($msg, 'LookUpMsg');
-	close_history();
+	my $msg = history_lookup($msg, 'LookUpMsg');
+	history_close();
 	if ($msg eq '') {
 	    im_info("message is not found.\n");
 	    exit $EXIT_ERROR;
@@ -129,23 +131,24 @@ if ($msg =~ /^http:/i) {
     }
 } elsif ($opt_src =~ /^\-(.*)/) {
     # News spool (-group[@server])
-    require IM::Nntp && import IM::Nntp;
-    my $rc;
+    require IM::Nntp && import IM::Nntp qw(nntp_spec nntp_open nntp_command
+					   nntp_article nntp_close);
+    my ($rc, $art);
 
-    my ($group, $srvs) = nntp_spec($1);
+    my ($group, $srvs) = nntp_spec($1, nntpservers());
     local @servers = split(',', $srvs);
     im_notice("accessing to $group on $srvs.\n");
     do {
-	if (($rc = &nntp_open(\@servers, 0)) < 0) {
+	if (($rc = nntp_open(\@servers, 0)) < 0) {
 	    im_die("can not connect $srvs.\n");
 	}
-	if (($group ne '') && ($rc = &nntp_command("GROUP $group", 1)) < 0) {
+	if (($group ne '') && ($rc = nntp_command("GROUP $group", 1)) < 0) {
 	    im_die("can not access $group.\n");
 	}
     } while (@servers > 0 && $rc > 0);
     im_die("can not access $group on $srvs.\n") if ($rc);
-    ($rc, my $art) = &nntp_article($msg);
-    &nntp_close;
+    ($rc, $art) = nntp_article($msg);
+    nntp_close();
     if ($rc) {
 	im_die("no message $msg in -$group.\n");
     }
@@ -156,8 +159,16 @@ if ($msg =~ /^http:/i) {
     # IMAP folder (%folder[:[user[/auth]]@server])
     require IM::Imap && import IM::Imap;
     require IM::GetPass && import IM::GetPass;
-
-    my ($folder, $auth, $user, $host) = &imap_spec($1);
+    my ($folder, $auth, $user, $host);
+    
+    $folder = $1;
+    if ($folder !~ /[:\@]/) {
+	# Use ImapAccount spec, unless user or host is specified.
+	(my $dummy, $auth, $user, $host) = imap_spec('');
+	$folder =~ s/^%//;
+    } else {
+	($folder, $auth, $user, $host) = imap_spec($folder);
+    }
 
     my $pass = '';
     my $agtfound = 0;
@@ -176,7 +187,8 @@ if ($msg =~ /^http:/i) {
 
     im_warn("accessing IMAP/$auth:$user\@$host\n") if (&verbose);
 
-    if (&imap_open($auth, $host, $user, $pass) < 0) {
+    my ($rc, $HANDLE) = &imap_open($auth, $host, $user, $pass);
+    if ($rc < 0) {
 	im_warn("IMAP connection was not established.\n")
 	  if (&debug('imap') || &verbose);
 	&savepass('imap', $auth, $host, $user, '')
@@ -185,17 +197,17 @@ if ($msg =~ /^http:/i) {
     }
     &savepass('imap', $auth, $host, $user, $pass)
 	if ($interact && $pass ne '' && &usepwagent());
-    my $msgs = &imap_select($folder, 1);
+    my $msgs = &imap_select($HANDLE, $folder, 1);
     if ($msgs < 0) {
-	&imap_close;
-	im_warn("can't access to $folder\n");
+	&imap_close($HANDLE);
+	im_die("can't access to $folder\n");
     } else {
-	my ($rc, $message) = &imap_get($msg);
-	&imap_close;
+	my ($rc, $message) = &imap_get($HANDLE, $msg);
+	&imap_close($HANDLE);
 	if ($rc < 0) {
 	    im_die("can't access to message $msg in \%$folder.\n");
 	} elsif ($rc > 0) {
-	    im_warn("message $msg not found in \%$folder\n");
+	    im_die("message $msg not found in \%$folder\n");
 	}
 	foreach (@$message) {
 	    print;
@@ -209,7 +221,8 @@ sub join_msg ($) {
     my $msg = shift;
     my $path;
     local $_;
-    require IM::History && import IM::History;
+    require IM::History && import IM::History qw(history_open history_lookup
+						 history_close);
 
     # get master Message-ID
     my $header = '';
@@ -250,11 +263,11 @@ sub join_msg ($) {
     im_notice("Master Message-ID: $master.\n");
 
     # get Message-IDs of partial
-    if (open_history(0) < 0) {
+    if (history_open(0) < 0) {
 	im_err("can not open history.\n");
 	exit $EXIT_ERROR;
     }
-    my $ids = lookup_history("partial:$master", 'LookUpMsg');
+    my $ids = history_lookup("partial:$master", 'LookUpMsg');
     if ($ids eq '') {
 	im_err("information on partial messages is not found in history.\n");
 	exit $EXIT_ERROR;
@@ -265,7 +278,7 @@ sub join_msg ($) {
     my @paths;
     my $total = 0;
     foreach (split(',', $ids)) {
-	my $locate = lookup_history($_, 'LookUpMsg');
+	my $locate = history_lookup($_, 'LookUpMsg');
 	if ($locate eq '') {
 	    im_warn("message $_ not found, skipping.\n");
 	    next;
@@ -313,7 +326,7 @@ sub join_msg ($) {
 	$paths[$number] = $path;
 	im_notice("$path is part $number.\n");
     }
-    close_history();
+    history_close();
 
     # check existance of all partial messages
     my $missing = 0;
@@ -357,7 +370,7 @@ sub join_msg ($) {
     exit $EXIT_SUCCESS;
 }
 
-
 ### Local Variables:
 ### mode: perl
 ### End:
+

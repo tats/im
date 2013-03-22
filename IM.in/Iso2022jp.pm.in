@@ -20,12 +20,10 @@ package IM::Iso2022jp;
 require 5.003;
 require Exporter;
 
-use IM::Config;
-use IM::Address;
-use IM::EncDec;
-use IM::Header;
-#use IM::Message;
-use IM::Japanese;
+use IM::Util;
+use IM::EncDec qw(b_encode_string q_encode_string);
+use IM::Header qw(hdr_cat);
+use IM::Japanese qw(code_check conv_iso2022jp);
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -465,12 +463,12 @@ sub header_iso2022jp_conv ($$) {
 	    im_debug("Iso2022jp: code conversion from $c\n")
 		if (&debug('encode'));
 	    if ($c eq 'sjis' || $c eq 'euc') {
-		$$header[$i] = &conv_iso2022jp($$header[$i]);
+		$$header[$i] = &conv_iso2022jp($$header[$i], uc($c));
 	    }
 	    $c = 'jis';
 	}
 	if ($c eq 'jis') {
-	    if ($$header[$i] =~ /^([\w-]+:\s*)(.*)/s) {
+	    if ($$header[$i] =~ /^([\w-]+:\s*)(\S.*)/s) {
 		$field_name = $1;
 		$field_value = $2;
 		if ($field_name =~ /^Apparently-To:/i

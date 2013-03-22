@@ -21,7 +21,7 @@ require 5.003;
 require Exporter;
 
 use IM::Config;
-use IM::Stdio;
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -116,7 +116,7 @@ sub connect_agent ($) {
     my ($surpresserror) = shift;
     require Socket && import Socket;
 
-    my $realuser = login_name();
+    my $realuser = im_getlogin();
     unless ($realuser) {
 	im_warn("pwagent: can not get login name\n") unless ($surpresserror);
 	return '';

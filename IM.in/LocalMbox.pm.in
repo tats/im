@@ -22,8 +22,8 @@ require Exporter;
 
 use Fcntl;
 use IM::Config;
-use IM::MsgStore;
-use IM::Stdio;
+use IM::Util;
+use IM::MsgStore qw(store_message exec_getsbrfile);
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -78,9 +78,8 @@ sub local_get_msg ($$$$) {
 	im_notice("qmail access disabled.\n");
     }
 
-#   my $user = $ENV{'USER'};
-#   $user = $ENV{'LOGNAME'} unless ($user);
-    my $user = login_name();
+#    my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || im_getlogin();
+    my $user = im_getlogin();
     my $home = $ENV{'HOME'};
     if ($user eq '' || $home eq '') {
 	my @pw = getpwuid($<);
@@ -293,7 +292,8 @@ sub process_mbox ($$$) {
 	    if ($format eq 'MMDF' && $_ =~ /^\001\001\001\001$/) {
 		$first_line = 'MMDF';
 		last;
-	    } elsif ($length <= 0 && /^From / && $Message[$#Message] eq "\n") {
+	    } elsif ($format eq 'UNIX' && $length <= 0
+		  && /^From / && $Message[$#Message] eq "\n") {
 		chomp($first_line = $_);
 		last;
 	    } elsif ($inheader) {

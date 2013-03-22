@@ -23,7 +23,8 @@ $Prog = 'impath';
 ##
 
 use IM::Config;
-use IM::Folder;
+use IM::Util;
+use IM::Folder qw(cur_folder get_impath);
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
@@ -86,14 +87,19 @@ if ($opt_list) {
 my @msgs;
 
 foreach (@ARGV) {
-    if (/^[+=]/) {
+    if (/^[+=%]/) {
 	$folder = $_;
     } else {
 	push(@msgs, $_);
     }
 }
 
-impath($folder, @msgs);
+if ($folder =~ /^%/) {
+    require IM::Imap && import IM::Imap qw(imap_folder_regname);
+    print imap_folder_regname($folder), "\n";
+} else {
+    impath($folder, @msgs);
+}
 
 exit $EXIT_SUCCESS;
 
@@ -113,6 +119,9 @@ sub show_path () {
     print "DraftFolder=" . draft_folder() . "\n";
     print "TrashFolder=" . trash_folder() . "\n";
     print "PetnameFile=" . petnamefile() . "\n";
+    print "QueuePath=" . queue_path() . "\n";
+    print "ImapAccount=" . imapaccount() . "\n";
+    print "ConfigCases=" . config_cases() . "\n";
 }
 
 ##
@@ -121,7 +130,7 @@ sub show_path () {
 
 sub imfolders ($$) {
     my ($folder, $prefix) = @_;
-    $FOLDER_ROOT = impath_work($folder);
+    $FOLDER_ROOT = get_impath($folder);
     $FOLDER_ROOT =~ s:/$::;
     dig_dir($FOLDER_ROOT, $prefix);
 }
@@ -151,25 +160,13 @@ sub impath ($@) {
     my $folder = shift;
     my @msgs   = @_;
 
-    my @paths = impath_work($folder, @msgs);
+    my @paths = get_impath($folder, @msgs);
 
     die $@ if (scalar(@paths) == 0); # XXX
 
     foreach (@paths) {
 	print "$_\n";
     }
-}
-
-sub impath_work ($@) {
-    my $folder = shift;
-    my @msgs  = @_;
-    my @paths;
-
-    im_debug("impath_work: folder: $folder msgs: @msgs\n") if (&debug('all'));
-    @paths = get_message_paths($folder, @msgs);
-    im_debug("impath_work: paths: @paths\n") if (&debug('all'));
-
-    return wantarray ? @paths : $paths[0];
 }
 
 ### Local Variables:

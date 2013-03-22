@@ -7,9 +7,9 @@
 require 5.004;
 
 BEGIN {
-$VERSION = '76';
-$im_version="version 971024";
-$im_revised="Oct 24, 1997";
+$VERSION = '91';
+$im_version="version 980506;
+$im_revised="May 06, 1998";
 $im_db_type="DB";
 
 # this should be in BEGIN section.

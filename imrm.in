@@ -25,27 +25,33 @@ $Prog = 'imrm';
 use IM::Config;
 use IM::Folder;
 use IM::File;
-use IM::Stdio;
+use IM::MsgStore;
+use IM::Util;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
-	    $opt_src $opt_noharm $opt_quiet $opt_verbose $opt_debug $opt_help);
+	    @msgs
+	    $opt_noharm $opt_src @opt_dst
+	    $opt_verbose $opt_debug $opt_help);
 
 ##
 ## Environments
 ##
 
+my %NewMsgCache = ();
+my %ImapHandleCache = ();
+
 $EXPLANATION = "
-$Prog :: Internet Message Garbage Cleanup
+$Prog :: Internet Message Remove
 $VERSION
 
-Usage: $Prog [options] [msgs...]
+Usage: $Prog [options] +folder... msgs...
 ";
 
 @OptConfig = (
-    'src;F;;'     => "Set a folder to be cleaned up.",
-    'noharm;b;;'  => "Do not delete files, show what will be performed.",
-    'quiet;b;;'   => "Do not show any messages.",
+    'src;F;;'     => "Set source folder.",
+    'dst;f@;;'    => "Set destination folder.",
+    'noharm;b;;'  => "Display the commands but do not actually execute them.",
     'verbose;b;;' => 'With verbose messages.',
     'debug;d;;'   => "With debug message.",
     'help;b;;'    => "Show this message.",
@@ -66,37 +72,232 @@ debug_option($opt_debug) if $opt_debug;
 ## Main
 ##
 
-my @msgs = @ARGV;
-@msgs = ('all') if (!@ARGV);
+@opt_dst = uniq(@opt_dst);
 
-imrm($opt_src, @msgs);
+@ARGV    || im_die "no message specified.\n";
+
+@msgs  = @ARGV;
+
+imrm($opt_src, \@opt_dst, \@msgs);
 exit $EXIT_SUCCESS;
 
+##################################################
 ##
-## work horse
+## Work horse
+##
+sub imrm ($$$) {
+    my ($src, $dsts, $msgs) = @_;
+    my @msg_paths;
 
-sub imrm ($@) {
-    my ($folder, @msgs) = @_;
-    my @paths = get_message_paths($folder, @msgs);
-    my $i = 0;
-
-    if (scalar(@paths) == 0) {
-	im_warn("no msgs in $folder\n");
-	return;
+    if ($src =~ /^%/o) {
+	require IM::Imap && import IM::Imap;
+	require IM::GetPass && import IM::GetPass;
     }
 
-    print "unlinking msgs in $folder ... " unless ($opt_noharm || $opt_quiet);
-    flush('STDOUT') unless $opt_noharm;
+    chk_folder_existance($src, @{$dsts}); # ignore IMAP folders
+    open_imap_folders(0, $src);
+    open_imap_folders(1, @{$dsts});
 
-    foreach (@paths) {
-	im_die("invalid message specification (unlinked $i message(s))\n")
-	    if (!-f $_);
-	im_unlink($_);
-	$i++;
+    if ($src !~ /^%/) {
+	chk_msg_existance($src, @{$msgs});
+    } else {
+	my ($HANDLE, $srcacct, $srcset);
+	my ($getbox, $link) = ('+inbox', 0);
+	my $link_1st;
+
+	$srcacct = imap_folder_acct($src);
+	$HANDLE = $ImapHandleCache{$srcacct};
+	if (imap_select($HANDLE, imap_folder_name($src), 1) < 0) {
+	    im_warn("can't select $src source folder.\n");
+	    close_imap_folders();
+	    exit($EXIT_ERROR);
+	}
+	$srcset = imap_range2set($HANDLE, @{$msgs});
+
+	for (my $i = 0; $i < @{$dsts}; $i++) {
+	    if (imap_folder_acct(${$dsts}[$i]) eq $srcacct) {
+		my $dst = splice(@{$dsts}, $i, 1); $i--;
+		if (imap_copy($HANDLE,
+			      $srcset,
+			      imap_folder_name($dst), 0) < 0) {
+		    im_warn("can't copy to $dst folder.\n");
+		    close_imap_folders();
+		    exit($EXIT_ERROR);
+		}
+	    } elsif (!$link && ${$dsts}[$i] =~ /^\+/) {
+		($getbox, $link) = (splice(@{$dsts}, $i, 1), 1); $i--;
+		($link_1st) = (get_impath($getbox, 'new') =~ m|([^/]+)$|);
+		get_imap_messages($HANDLE, $getbox, @{$msgs});
+	    }
+	}
+	unless (@{$dsts}) {
+	    imap_delete($HANDLE, $srcset);
+	    close_imap_folders();
+	    return 0;
+	}
+
+	unless ($link) {
+	    ($link_1st) = (get_impath($getbox, 'new') =~ m|([^/]+)$|);
+	    get_imap_messages($HANDLE, $getbox, @{$msgs});
+	}
+	imap_delete($HANDLE, $srcset);
+
+	$src = $getbox;
+	$msgs = ["$link_1st-last"];
     }
 
-    print "done\n" unless ($opt_noharm || $opt_quiet);
-    touch_folder($folder) unless $opt_noharm;
+    @msg_paths = get_impath($src, @{$msgs});
+    foreach (@msg_paths){
+	imrm_one($_, $dsts);
+    }
+    close_imap_folders();
+    return 0;
+}
+
+sub imrm_one ($$) {
+    my ($src_path, $dsts) = @_;
+    my ($dst_path, $link_it);
+
+    foreach (@{$dsts}){
+	unless (/^%/) {
+	    if ($NewMsgCache{$_}){
+		$NewMsgCache{$_} =~ s|([^/]+)$|$1+1|e; # increment cache
+		$dst_path = $NewMsgCache{$_};
+	    } else {
+		$dst_path = $NewMsgCache{$_} = get_impath($_, 'new');
+	    }
+	    if ($link_it){
+		im_link($link_it, $dst_path) || die $@;       # XXX
+	    } else {
+		im_rename($src_path, $dst_path) || die $@;    # XXX
+		$link_it = $dst_path;
+	    }
+	    touch_folder($dst_path) unless $opt_noharm;
+	} else {
+	    my $HANDLE = $ImapHandleCache{imap_folder_acct($_)};
+	    my $idst = imap_folder_name($_);
+	    put_imap_message($HANDLE, $idst, $link_it || $src_path);
+	}
+    }
+    im_unlink($src_path) unless ($link_it);
+}
+
+sub uniq (@) {
+    my @array = @_;
+    my %hash;
+
+    foreach (@array){
+	$hash{$_} = $_;
+    }
+    return keys(%hash);
+}
+
+##
+## IMAP subroutines
+##
+
+sub get_imap_messages ($$@) {
+    my ($HANDLE, $dst, @ranges) = @_;
+    my @msgs = imap_range2msgs($HANDLE, @ranges);
+
+    if ($msgs[0] < 0) {
+	im_warn("can't find source message(s).\n");
+	close_imap_folders();
+	exit($EXIT_ERROR);
+    }
+    foreach (@msgs) {
+	my ($rc, $msgref) = imap_get($HANDLE, $_);
+	if ($rc < 0) {
+	    im_warn("can't get msg $_ from source folder.\n");
+	    close_imap_folders();
+	    exit($EXIT_ERROR);
+	}
+	local $main::opt_noscan = 1; # for quiet store_message
+	if (store_message($msgref, $dst) < 0) {
+	    im_warn("can't store msg $_ to $dst folder.\n");
+	    close_imap_folders();
+	    exit($EXIT_ERROR);
+	}
+    }
+}
+
+sub put_imap_message ($$$) {
+    my ($HANDLE, $dst, $src_path) = @_;
+    my @Message;
+    local (*SRC);
+
+    unless (open(SRC, "<$src_path")) {
+	im_warn("can't open local message $src_path.\n");
+	close_imap_folders();
+	exit($EXIT_ERROR);
+    }
+    local $_;
+    while (<SRC>) {
+	push(@Message, $_);
+    }
+    if (imap_put($HANDLE, $dst, \@Message) < 0) {
+	im_warn("can't store msg $src_path to $dst folder.\n");
+	close(SRC);
+	close_imap_folders();
+	exit($EXIT_ERROR);
+    }
+    close(SRC);
+}
+
+sub open_imap_folders ($@) {
+    my ($create, @folders) = @_;
+
+    foreach (@folders) {
+	next unless (/^%/);
+	my $acct = imap_folder_acct($_);
+	my $ifld = imap_folder_name($_);
+	my ($rc, $HANDLE);
+
+	unless ($HANDLE = $ImapHandleCache{$acct}) {
+	    my ($pass, $agtfound, $interact) = ('', 0, 0);
+	    my ($dummy, $auth, $user, $host)
+		= imap_spec(imap_folder_regname($_));
+
+	    if (usepwagent()) {
+		$pass = loadpass('imap', $auth, $host, $user);
+		$agtfound = 1 if ($pass ne '');
+	    }
+	    if ($pass eq '' && usepwfiles()) {
+		$pass = findpass('imap', $auth, $host, $user);
+	    }
+	    if ($pass eq '') {
+		$pass = getpass("Password for $acct: ");
+		$interact = 1;
+	    }
+
+	    ($rc, $HANDLE) = imap_open($auth, $host, $user, $pass);
+	    if ($rc < 0) {
+		im_warn("can't open IMAP connection to $host.\n");
+		savepass('imap', $auth, $host, $user, '')
+		    if ($agtfound && usepwagent());
+		close_imap_folders();
+		exit($EXIT_ERROR);
+	    }
+	    savepass('imap', $auth, $host, $user, $pass)
+		if ($interact && $pass ne '' && usepwagent());
+	    $ImapHandleCache{$acct} = $HANDLE;
+	}
+
+	if ((imap_select($HANDLE, $ifld, 1) < 0) && $create) {
+	    if (imap_create_folder($HANDLE, $ifld) < 0) {
+		im_warn("can't create $_ folder.\n");
+		close_imap_folders();
+		exit($EXIT_ERROR);
+	    }
+	}
+    }
+}
+
+sub close_imap_folders () {
+    foreach (keys(%ImapHandleCache)) {
+	imap_close($ImapHandleCache{$_});
+    }
+    %ImapHandleCache = ();
 }
 
 ### Local Variables:

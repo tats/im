@@ -23,9 +23,11 @@ $Prog = 'imhist';
 ##
 
 use IM::Config;
+use IM::Address;
 use IM::Header;
 use IM::History;
 use IM::Message;
+use IM::Util;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
@@ -75,26 +77,26 @@ if (msgdbfile() eq '') {
     im_die("MsgDBFile is not defined.\n");
 }
 if ($opt_lookup ne '') {
-    exit $EXIT_ERROR if (open_history(1) < 0);
+    exit $EXIT_ERROR if (history_open(1) < 0);
 #   unless ($opt_lookup =~ /^<.*>$/) {
 #	im_warn("Message-ID should be surrounded by <>.\n");
 #	exit $EXIT_ERROR;
 #   }
-    my $msg = lookup_history($opt_lookup, LookUpMsg);
+    my $msg = history_lookup($opt_lookup, LookUpMsg);
     if ($msg eq '') {
 	im_info("no entry found for $opt_lookup\n");
 	exit $EXIT_ERROR;
     } else {
 	print $msg . "\n";
     }
-    close_history();
+    history_close();
 } elsif ($opt_remove ne '') {
-    exit $EXIT_ERROR if (open_history(1) < 0);
+    exit $EXIT_ERROR if (history_open(1) < 0);
 #   unless ($opt_lookup =~ /^<.*>$/) {
 #	im_warn("Message-ID should be surrounded by <>.\n");
 #	exit $EXIT_ERROR;
 #   }
-    my $num = delete_history($opt_remove, $opt_msg);
+    my $num = history_delete($opt_remove, $opt_msg);
     if ($num < 0) {
 	im_warn("no entry found for $opt_remove\n");
 	exit $EXIT_ERROR;
@@ -104,27 +106,27 @@ if ($opt_lookup ne '') {
     } else {
 	im_info("entry for $opt_remove deleted\n");
     }
-    close_history();
+    history_close();
 } elsif ($opt_dump) {
-    exit $EXIT_ERROR if (open_history(0) < 0);
-    dump_history();
-    close_history();
+    exit $EXIT_ERROR if (history_open(0) < 0);
+    history_dump();
+    history_close();
 } elsif ($opt_add ne '') {
     my $p = expand_path($opt_add);
     if (-f $p) {
 	# single file
-	if (open_history(1) < 0) {
+	if (history_open(1) < 0) {
 	    exit $EXIT_ERROR;
 	}
 	add_msg_info($p, $opt_add);
-	close_history();
+	history_close();
     } elsif (-d $p) {
 	# folder
-	if (open_history(1) < 0) {
+	if (history_open(1) < 0) {
 	    exit $EXIT_ERROR;
 	}
 	add_folder_info($p, $opt_add);
-	close_history();
+	history_close();
     } else {
 	im_warn("no message found to add.\n");
 	exit $EXIT_ERROR;
@@ -143,7 +145,8 @@ sub add_msg_info ($$) {
 	&read_header(\*MSG, \@Hdr, 0);
 	my $mid = &header_value(\@Hdr, 'Message-ID');
 #	my $dt = &header_value(\@Hdr, 'Date');
-	(my $ver = &header_value(\@Hdr, 'Mime-Version')) =~ s/\s//g;
+	my $ver = &extract_addr(&header_value(\@Hdr, 'Mime-Version'));
+	$ver =~ s/\s//g;
 	my $master = '';
 	if ($ver eq '1.0') {
 	    my $ct = &header_value(\@Hdr, 'Content-Type') . ';';
@@ -154,8 +157,8 @@ sub add_msg_info ($$) {
 	    }
 	}
 	if ($mid ne '') {
-	    store_history($mid, $msg);
-	    store_history("partial:$master", $mid) if ($master ne '');
+	    history_store($mid, $msg);
+	    history_store("partial:$master", $mid) if ($master ne '');
 	}
 	close (MSG);
 	return 0;
@@ -184,12 +187,14 @@ sub add_folder_info ($$) {
 	}
     }
     closedir(FOLDER);
-    my $l;
-    foreach $l (@lower) {
-	if ($folder eq '+') {
-	    add_folder_info("$dir/$l", "+$l");
-	} else {
-	    add_folder_info("$dir/$l", "$folder/$l");
+    if($opt_subfolders eq '1'){
+	my $l;
+	foreach $l (@lower) {
+	    if ($folder eq '+') {
+		add_folder_info("$dir/$l", "+$l");
+	    } else {
+		add_folder_info("$dir/$l", "$folder/$l");
+	    }
 	}
     }
 }

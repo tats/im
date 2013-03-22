@@ -20,10 +20,8 @@ package IM::Http;
 require 5.003;
 require Exporter;
 
-use IM::Config;
+use IM::Util;
 use IM::TcpTransaction;
-#use IM::MsgStore;
-#use IM::Stdio;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -102,17 +100,15 @@ sub http_get ($$$) {
 }
 
 # http_process(spec)
-sub http_process ($) {
-    my ($spec) = shift;
+sub http_process ($;$$) {
+    my ($spec, $http_proxy, $no_proxy) = @_;
     my ($msg, $rcode, $auth);
     my ($user, $host, $port, $path);
     my ($target_host, $target_port);
 
-    my $http_proxy = '';
-    my $no_proxy = &noproxy();
-    $http_proxy = &httpproxy() unless ($no_proxy ne '' && $spec =~ /$no_proxy/);
+    $http_proxy = '' if ($no_proxy && $spec =~ /$no_proxy/);
 
-    if ($http_proxy ne '') {
+    if ($http_proxy) {
 	im_notice("using proxy: $http_proxy\n");
 	if ($http_proxy =~ /(.*):(.*)/) {
 	    $target_host = $1;
@@ -208,7 +204,7 @@ sub http_spec ($) {
     }
     $spec =~ s/^http://i;
     my $host = 'localhost';
-    my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || login_name();
+    my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || im_getlogin();
     my $port = 0;
     my $path;
 

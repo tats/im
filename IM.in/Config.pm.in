@@ -20,27 +20,25 @@ package IM::Config;
 require 5.003;
 require Exporter;
 
+use IM::Util;
 use integer;
 use strict 'vars';
 use strict 'subs';
-use vars qw(@ISA @EXPORT
-	    $SUCCESS $ERROR $EXIT_SUCCESS $EXIT_ERROR);
+use vars qw(@ISA @EXPORT);
 
 @ISA = qw(Exporter);
 @EXPORT = qw(
-    $ERROR $SUCCESS $EXIT_SUCCESS $EXIT_ERROR
-    unixp win95p wntp os2p
     read_cfg_selector
     init_opt
     read_env read_cfg read_opt
     set_selector used_selectors
     sanity_check
     help
-    progname
-    home_dir conf_dir mail_dir mail_path news_dir news_path
-    inbox_folder draft_folder trash_folder
+    home_dir conf_dir
+    mail_dir mail_path news_dir news_path queue_dir queue_path
+    inbox_folder draft_folder trash_folder config_cases
     preserve_dot
-    folder_mode msg_mode allowcrlf
+    folder_mode msg_mode allowcrlf no_sync
     aliases_file context_file
     address addresses_regex
     msgdbfile msgdbtype getsbrfile scansbrfile petnamefile
@@ -48,22 +46,20 @@ use vars qw(@ISA @EXPORT
     nntpservers nntphistoryfile
     popaccount pophistoryfile imapaccount httpproxy noproxy
     usepwagent pwagentport usepwfiles pwfiles
-    expand_path login_name
-    im_msg im_info im_debug im_notice im_warn im_err im_die im_die2
-    im_save_error im_saved_errors
-    debug_option set_debug debug set_verbose verbose
-);
+    expand_path
+    pop_timeout imap_timeout nntp_timeout dns_timeout
+    connect_timeout command_timeout rcv_buf_siz);
 
 ##
 ## Constant
 ##
 use vars qw($CURRENT_DIR $HOME_DIR $IM_SYS_DIR
 	    $IM_USER_DIR $IM_SYS_PROFILE $IM_USER_PROFILE
-	    $OS @CfgConfig
+	    @CfgConfig %CASES
 	    @O_IORD %O_DESC %O_VNAM %O_FULL %O_ABBR %O_HELP
 	    $O_FOPT %C_DESC %C_VNAM
 	    %WHO_SET
-	    @SELECTORS $SavedMsg %Debug);
+	    @SELECTORS);
 
 $CURRENT_DIR = $ENV{'PWD'} || eval { use Cwd; fastcwd(); } ||
     im_die("can't get your current directory\n");
@@ -84,62 +80,6 @@ $IM_USER_DIR = expand_home($ENV{'IM_USER_DIR'} || '.im');
 $IM_SYS_PROFILE = "$IM_SYS_DIR/SiteConfig";
 $IM_USER_PROFILE = "$IM_USER_DIR/Config";
 
-$SUCCESS = 1;
-$ERROR = 0;
-
-$EXIT_SUCCESS = 0;
-$EXIT_ERROR = 1;
-
-##
-
-my $osname = $^O;
-
-if ($osname =~ /win/i) {
-    if (Win32::IsWinNT()) {
-	$OS = 'WNT';
-    } elsif (Win32::IsWin95()) {
-	$OS = 'WIN95';
-    } else {
-	$OS = 'WIN95';		# xxx
-    }
-} elsif ($osname =~ /os2/i) {
-    $OS = 'OS/2';
-} else {
-    $OS = 'UNIX';
-}
-
-sub unixp {
-    if ($OS eq 'UNIX') {
-	return 1;
-    } else {
-	return 0;
-    }
-}
-
-sub win95p {
-    if (($OS eq 'WIN95') || ($OS eq 'WNT') ){
-	return 1;
-    } else {
-	return 0;
-    }
-}
-
-sub wntp {
-    if ($OS eq 'WNT') {
-	return 1;
-    } else {
-	return 0;
-    }
-}
-
-sub os2p {
-    if ($OS eq 'OS/2') {
-	return 1;
-    } else {
-	return 0;
-    }
-}
-
 ##
 ##
 ##
@@ -148,13 +88,16 @@ BEGIN {
 @CfgConfig = (
     'maildir;s;;MailDir'	=> 'A directory to contain mail messages',
     'newsdir;s;;NewsDir'	=> 'A directory to contain news messages',
+    'queuedir;s;;QueueDir'      => 'A directory to store messages to be sent',
     'inboxfolder;f;;InboxFolder'	=> 'Inbox folder',
     'draftfolder;f;;DraftFolder'	=> 'Draft folder',
     'trashfolder;f;;TrashFolder'	=> 'Trash folder',
     'foldermode;i;;FolderMode'		=> 'Folder directory mode when created',
     'msgmode;i;;MsgMode'		=> 'Message file mode when created',
+    'nosync;b;;NoSync'		=> 'Do not need fsync(2) on writing file',
     'allowcrlf;b;;AllowCRLF'		=> 'CRLF may be in saved message',
     'preservedot;b;;PreserveDot'	=> 'Not substitute "." with "/"',
+    'aliasesfile;s;;AliasesFile'        => 'Aliases file',
     'contextfile;s;Context;ContextFile'	=> 'Context file',
     'address;s;;Address'		=> 'Email addresses',
     'addrregex;s;;AddrRegex'		=> 'Email addresses by regex',
@@ -175,6 +118,13 @@ BEGIN {
     'pwagentport;i;;PwAgentPort'	=> 'Port to connect agent with TCP/IP',
     'usepwfiles;b;;UsePwFiles'		=> 'Use password files',
     'pwfiles;s;;PwFiles'		=> 'Password files',
+    'poptimeout;i;20;PopTimeout'	=> 'Timeout for POP connection',
+    'imaptimeout;i;20;ImapTimeout'	=> 'Timeout for IMAP connection',
+    'nntptimeout;i;20;NntpTimeout'	=> 'Timeout for NNTP connection',
+    'dnstimeout;i;60;DnsTimeout'	=> 'Timeout for DNS connection',
+    'connecttimeout;i;60;ConnectTimeout'  => 'Timeout for connection making',
+    'commandtimeout;i;300;CommandTimeout' => 'Timeout for each command',
+    'rcvbufsiz;i;;RcvBufSiz'		=> 'Receive buffer size of TCP',
     );
 
     # these vars should be in current package?
@@ -214,7 +164,7 @@ sub read_cfg_selector ($) {
 sub init_opt ($;$)
 {
     my ($optref, $cptref) = @_;
-    my ($name, $desc, $dflt, $vnam, $abbr, $optn, $help);
+    my ($name, $desc, $dflt, $vnam, $optn, $help);
     my ($i, $N);
 
     @O_IORD = (); ## option list in order
@@ -260,6 +210,11 @@ sub init_opt ($;$)
 	$help = $$optref[$i];
 	$i++;
 	if ($desc =~ /^(s|s@|i|i@|f|f@|F|F@|b|B|d)$/){
+	    my $abbr;
+	    if ($name =~ ',') {
+		($name, $abbr) = split(',', $name);
+		$abbr = "-$abbr";
+	    }
 	    $optn = lc("--$name");
 	    push(@O_IORD, $optn);
 	    if ($vnam) {
@@ -272,7 +227,7 @@ sub init_opt ($;$)
 	    $O_HELP{$optn} = $help;
 	    unless ($cptref || $desc eq 'd') {
 		# no @CptConfig, so set abbrev
-		$abbr = substr($optn, 1, 2);  # -h
+		$abbr = substr($optn, 1, 2) unless $abbr;  # -h
 		$O_FULL{$abbr} = $optn;
 		$O_ABBR{$optn} = $abbr;
 	    }
@@ -334,6 +289,7 @@ sub read_cfg () {
     my ($profile, @profiles);
     my $prev_line = '';
     my $case;
+    my @prog_cfg;
 
     @profiles = ('<DATA>', $IM_SYS_PROFILE, $IM_USER_PROFILE);
 
@@ -351,6 +307,7 @@ sub read_cfg () {
 
 	# start with 'default'
 	$case = 'default';
+	$CASES{$case}++;
 	while (<$fh>) {
 	    last if /^__END__/;	# for sake of SelfLoader
 	    next if /^#/;
@@ -375,13 +332,18 @@ sub read_cfg () {
 		foreach (split(',', $case)) {
 		    $_->{0} = '';
 		    delete $_->{0};
+		    $CASES{$_}++;
 		}
 		next;
 	    }
 	    if (/^(\*|[\w]+)\.(\w+)[:=]\s*(.+)$/) {
 		# Imls.Src=+inbox
-		if ((lc($1) eq progname()) || ($1 eq '*')) {
+		if ($1 eq '*') {
 		    set_value_cfg($2, $3, $case);
+		}
+		if (lc($1) eq progname()) {
+		    my @array = ($2, $3, $case);
+		    push(@prog_cfg, \@array);
 		}
 		next;
 	    }
@@ -398,6 +360,11 @@ sub read_cfg () {
 		im_die("Unexpected EOF at the bottom of config file.\n");
 	    }
 	}
+    }
+
+    my $array;
+    foreach $array (@prog_cfg) {
+	set_value_cfg(@$array);
     }
 }
 
@@ -533,7 +500,7 @@ sub help ($)
 	$spec = "=$spec"           if $spec;
 
 	if ($desc =~ /[bB]/) {
-	    if ($dflt && $dflt =~ /^on|yes|true|1$/) {
+	    if ($dflt && $dflt =~ /^(on|yes|true|1)$/) {
 		$dflt = 'on';
 	    } else {
 		$dflt = 'off';
@@ -626,7 +593,7 @@ sub set_value ($$$$)
 	    # value is omitted or "-opt" specified. In that case,
 	    # 'b' becames 1 while 'B' becames 0.
 	    # 'B' never means negate boolean. True is always '1'.
-	    if ($val =~ /^yes|on|true|1$/i) {
+	    if ($val =~ /^(yes|on|true|1)$/i) {
 		${$vnam} = 1;
 	    } else {
 		${$vnam} = 0;
@@ -641,7 +608,7 @@ sub set_value ($$$$)
 	} else {
 	    ${$vnam} = $val;
 	}
-	im_debug("\$$vnam = ", ${$vnam}, "\n") if &debug('config');
+	im_debug("\$$vnam = ${$vnam}\n") if &debug('config');
     }
 
     return 1;
@@ -656,7 +623,7 @@ sub set_value_case ($$$$)
     $case = lc($case);
 
     if ($desc =~ /[bB]/) {
-	if ($val =~ /^yes|on|true|1$/i) {
+	if ($val =~ /^(yes|on|true|1)$/i) {
 	    $case->{$vnam} = 1;
 	} else {
 	    $case->{$vnam} = 0;
@@ -678,10 +645,6 @@ sub set_value_case ($$$$)
 ###
 ### Config vs Default
 ###
-
-sub progname () {
-    return $main::Prog;
-}
 
 sub current_dir () {
     return $CURRENT_DIR;
@@ -711,6 +674,14 @@ sub news_path () {
     return expand_home(news_dir());
 }
 
+sub queue_dir () {
+    return $QueueDir;
+}
+
+sub queue_path () {
+    expand_path(queue_dir());
+}
+
 sub inbox_folder () {
     return $InboxFolder;
 }
@@ -721,6 +692,15 @@ sub draft_folder () {
 
 sub trash_folder () {
     return $TrashFolder;
+}
+
+sub config_cases () {
+    my @cases = keys(%CASES);
+    if (scalar(@cases) >= 2) {
+	return join(',', @cases);
+    } else {
+	return '';
+    }
 }
 
 sub preserve_dot () {
@@ -747,6 +727,14 @@ sub msg_mode ($) {
 
 sub allowcrlf () {
     return $AllowCRLF;
+}
+
+sub no_sync () {
+    return $NoSync;
+}
+
+sub aliases_file () {
+    return $AliasesFile;
 }
 
 sub context_file () {
@@ -829,6 +817,34 @@ sub pwfiles () {
     return $PwFiles;
 }
 
+sub pop_timeout () {
+    return $PopTimeout;
+}
+
+sub imap_timeout () {
+    return $ImapTimeout;
+}
+
+sub nntp_timeout () {
+    return $NntpTimeout;
+}
+
+sub dns_timeout () {
+    return $DnsTimeout;
+}
+
+sub connect_timeout () {
+    return $ConnectTimeout;
+}
+
+sub command_timeout () {
+    return $CommandTimeout;
+}
+
+sub rcv_buf_siz () {
+    return $RcvBufSiz;
+}
+
 ###
 ### path expansion
 ###
@@ -881,136 +897,6 @@ sub expand_path ($) {
     return $folder;
 }
 
-###
-### get login name
-###
-sub login_name () {
-    if (&unixp()) {
-	return getlogin() || (getpwuid($<))[0];
-    } elsif (&os2p()){
-	return getlogin();
-    } elsif (&win95p()){
-	return Win32::LoginName();
-    }
-}
-
-###
-### message
-###
-
-sub im_msg ($) {
-    my $msg = shift;
-    print progname(), ': ', $msg;
-}
-
-sub im_info ($) {
-    my $info = shift;
-    return if $main::opt_quiet;
-    print progname(), ': ', $info;
-}
-
-sub im_debug ($) {
-    my $dbg = shift;
-    print STDERR progname(), ':DEBUG: ', $dbg;
-}
-
-sub im_notice ($) {
-    return unless &verbose;
-    my $warn = progname() . ': '. shift;
-    $SavedMsg .= $warn;
-    print STDERR $warn;
-}
-
-sub im_warn ($) {
-    my $warn = progname() . ': '. shift;
-    $SavedMsg .= $warn;
-    print STDERR $warn;
-}
-
-sub im_err ($) {
-    my $err = progname() . ': ERROR: ' . shift;
-    $SavedMsg .= $err;
-    print STDERR $err;
-}
-
-sub im_die ($) {
-    my $die = shift;
-    print STDERR progname(), ': ERROR: ', $die;
-    exit $EXIT_ERROR;
-}
-
-sub im_die2 ($) {
-    my $die = shift;
-    print STDERR progname(), ': ', $die;
-    exit $EXIT_ERROR;
-}
-
-sub im_save_error (;$) {
-    my $string = shift;
-    if ($string eq '') {
-	$SavedMsg = '';	# reset
-    } else {
-	$SavedMsg .= $string;
-    }
-}
-
-sub im_saved_errors () {
-    return $SavedMsg;
-}
-
-###
-### Debug
-###
-
-sub print_hash (\%)
-{
-    my $hashref = shift;
-
-    foreach (keys(%{$hashref})){
-	print "$_ -> $hashref->{$_}\n";
-    }
-}
-
-sub set_debug ($$) {
-    my $category = shift;
-
-    $Debug{$category} = shift;
-}
-
-sub debug ($) {
-    my $category = shift;
-
-    if ($Debug{'all'}) {
-	return $Debug{'all'};
-    } else {
-	return $Debug{$category};
-    }
-}
-
-sub set_verbose ($) {
-    $main::opt_verbose = shift;
-}
-
-sub verbose () {
-    return $main::opt_verbose;
-}
-
-##### SET DEBUG OPTION #####
-#
-# debug_option()
-#
-sub debug_option ($) {
-    my $DebugFlag = shift;
-
-    if ($DebugFlag) {
-	foreach (split(',', $DebugFlag)) {
-	    im_warn("setting debug level $_=1\n");
-	    &set_debug($_, 1);
-	}
-	&set_verbose(1);
-    }
-}
-
 1;
 __DATA__
 ##
@@ -1032,11 +918,12 @@ ContextFile=Context		# relative to ~/.im/
 ##
 # folders
 Src=$InboxFolder		# default source of most commands
-Imrm.Src=$TrashFolder		# default source for message cleanups
+Imclean.Src=$TrashFolder	# default source for message cleanups
+Imrm.dst=$TrashFolder		# default trash folder
 # mail address aliases for imali/imput
 AliasesFile=Aliases		# relative to ~/.im/
 # imget/imls
-Form=%5n %m%d %-14A %-18S %b	# default format for scanning
+Form=%+5n %m%d %-14A %-18S %b	# default format for scanning
 Width=80			# default width for scanning
 JisSafe=on			# escape seq. of JIS char. should be managed
 Indent=2			# indent step for threading
@@ -1047,6 +934,7 @@ Smtpservers=localhost		# default server for SMTP
 NntpServers=localhost		# default server for NNTP
 # imput
 FccDir=$MailDir
+QueueDir=queue			# relative to ~/.im/
 # imget
 Imget.Src=local			# default source of imget (local mailbox)
 PopHistory=pophist		# to save last state (relative to ~/.im/)

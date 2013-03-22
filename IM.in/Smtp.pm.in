@@ -21,8 +21,10 @@ require 5.003;
 require Exporter;
 
 use IM::Config;
+use IM::Util;
 use IM::Log;
-use IM::Message;
+use IM::Message qw(message_size put_header put_body put_mimed_bcc
+		   put_mimed_partial put_mimed_error_notify set_crlf);
 use IM::TcpTransaction;
 use integer;
 use strict;

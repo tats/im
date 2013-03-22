@@ -20,7 +20,7 @@ package IM::Address;
 require 5.003;
 require Exporter;
 
-use IM::Config;
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -83,12 +83,13 @@ sub extract_addr ($) {
 #
 sub replace_addr ($$$) {
     my ($expr, $old, $new) = @_;
+    my $qold = quotemeta($old);
 
-    if ($expr =~ /$old.*$old/) {
+    if ($expr =~ /$qold.*$qold/) {
 	# multiple appearance
 	return $new;	# XXX drop comment portion
     }
-    $expr =~ s/$old/$new/;
+    $expr =~ s/$qold/$new/;
     return $expr if (&extract_addr($expr) eq $new);
     # something wrong. why?
     return $new;	# XXX drop comment portion

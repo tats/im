@@ -20,16 +20,13 @@ package IM::Japanese;
 require 5.003;
 require Exporter;
 
-use IM::Config;
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter);
-@EXPORT = qw(
-	code_check body_code
-	body_convert_iso2022jp conv_iso2022jp
-	conv_from_sjis s2e s2j conv_from_euc e2j
-);
+@EXPORT = qw(code_check code_check_body
+	     convert_iso2022jp_body conv_iso2022jp);
 
 =head1 NAME
 
@@ -78,26 +75,30 @@ BEGIN {
 #
 sub code_check ($) {
     my $line = shift;
+    my ($sjis, $euc);
 
     if ($line =~ /^$C_ascii$/o) {
 	return 'ascii';
     } elsif ($line =~ /^$C_ascii($C_jis($C_jis_roman)+)+$/o) {
-	    return 'jis';
-    } elsif ($line =~ /^($C_ascii$C_SorE)+$C_ascii$/o) {
-	    return 'sORe';
-    } elsif ($line =~ /^($C_ascii($C_sjis|$C_sjis_kana))+$C_ascii$/o) {
-	    return 'sjis';
-    } elsif ($line =~ /^($C_ascii($C_euc|$C_euc_kana))+$C_ascii$/o) {
-	    return 'euc';
-#   } elsif ($line =~ /$C_8bit/o) {
-#	return '8bit';
+	return 'jis';
+    }
+
+    $euc = 1 if $line =~ /^($C_ascii($C_euc|$C_euc_kana))+$C_ascii$/o;
+    $sjis = 1 if $line =~ /^($C_ascii($C_sjis|$C_sjis_kana))+$C_ascii$/o;
+
+    if ($euc && $sjis) {
+	return 'sORe';
+    } elsif ($euc) {
+	return 'euc';
+    } elsif ($sjis) {
+	return 'sjis';
     }
     return '8bit';
 }
 
 ##### BODY CODE CHECKER #####
 #
-# body_code(content)
+# code_check_body(content)
 #	content: pointer to body content line list
 #	return value: encode type
 #		ASCII
@@ -106,7 +107,7 @@ sub code_check ($) {
 #		EUC
 #		SJIS
 #
-sub body_code ($) {
+sub code_check_body ($) {
     my $content = shift;
     my (%count) = ();
 
@@ -121,7 +122,7 @@ sub body_code ($) {
 
     my $i;
     for ($i = 0; $i <= $#$content; $i++) {
-	$count{&code_check($$content[$i])}++;
+	$count{code_check($$content[$i])}++;
 	my $line = $$content[$i];
 	$count{'total'} += length($line);
 	$line =~ s/[^\x80-\xff]//g;
@@ -134,12 +135,12 @@ sub body_code ($) {
 	$main::Need_base64_encoded = 0;
     }
     if (&debug('code')) {
-	im_warn("ascii = $count{'ascii'}\n");
-	im_warn("8bit = $count{'8bit'}\n");
-	im_warn("jis = $count{'jis'}\n");
-	im_warn("euc = $count{'euc'}\n");
-	im_warn("sjis = $count{'sjis'}\n");
-	im_warn("sORe = $count{'sORe'}\n");
+	im_debug("ascii = $count{'ascii'}\n");
+	im_debug("8bit = $count{'8bit'}\n");
+	im_debug("jis = $count{'jis'}\n");
+	im_debug("euc = $count{'euc'}\n");
+	im_debug("sjis = $count{'sjis'}\n");
+	im_debug("sORe = $count{'sORe'}\n");
     }
     return '8BIT' if ($count{'8bit'});
     if ($count{'jis'}) {
@@ -158,16 +159,17 @@ sub body_code ($) {
 
 ##### CONVERT BODY INTO ISO-2022-JP ENCODING #####
 #
-# body_convert_iso2022jp(content)
+# convert_iso2022jp_body(content)
 #	content: pointer to body content line list
+#	code: input kanji code
 #	return value: none
 #
-sub body_convert_iso2022jp ($) {
-    my $content = shift;
+sub convert_iso2022jp_body ($$) {
+    my ($content, $code) = @_;
 
     my $i;
     for ($i = 0; $i <= $#$content; $i++) {
-	$$content[$i] = &conv_iso2022jp($$content[$i]);
+	$$content[$i] = conv_iso2022jp($$content[$i], $code);
     }
 }
 
@@ -175,31 +177,29 @@ sub body_convert_iso2022jp ($) {
 #
 # conv_iso2022jp(line)
 #	line: a line of string to be converted
+#	code: input kanji code
 #	return value: converted line
 #
-sub conv_iso2022jp ($) {
-    my $line = shift;
-
+sub conv_iso2022jp ($;$) {
+    my ($line, $code) = @_;
+    
     im_debug("conv_iso2022jp: $line\n") if (&debug('japanese'));
-    if ($line =~ /^$C_ascii$/o) {
+
+    unless ($code) {
+	$code = uc(code_check($line));
+	$code = uc($main::Default_code) if ($code == 'SORE');
+    }
+
+    if ($code eq 'ASCII') {
 	im_debug("source is ascii\n") if (&debug('japanese'));
 	return $line;
-    } elsif ($line =~ /^$C_ascii($C_jis($C_jis_roman)+)+$/o) {
+    } elsif ($code eq 'JIS') {
 	im_debug("source is jis\n") if (&debug("japanese"));
 	return $line;
-    } elsif ($line =~ /^($C_ascii$C_SorE)+$C_ascii$/o) {
-	my ($c) = $main::Body_code;
-	$c = uc($main::Default_code) if ($c eq '');
-	im_debug("source is sjis or euc, $c assumed\n") if (&debug('japanese'));
-	if ($c eq 'SJIS') {
-	    return &conv_from_sjis($line);
-	} else {
-	    return &conv_from_euc($line);
-	}
-    } elsif ($line =~ /^($C_ascii($C_euc|$C_euc_kana))+$C_ascii$/o) {
+    } elsif ($code eq 'EUC') {
 	im_debug("source is euc\n") if (&debug('japanese'));
 	return &conv_from_euc($line);
-    } elsif ($line =~ /^($C_ascii($C_sjis|$C_sjis_kana))+$C_ascii$/o) {
+    } elsif ($code eq 'SJIS') {
 	im_debug("source is sjis\n") if (&debug('japanese'));
 	return &conv_from_sjis($line);
     }

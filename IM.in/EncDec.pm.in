@@ -20,7 +20,6 @@ package IM::EncDec;
 require 5.003;
 require Exporter;
 
-use IM::Config;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -114,7 +113,7 @@ sub mime_encode_string ($$$) {
 		$in = 1;
 		if ($single ne '') {
 		    if ($single =~ /[\x00-\x1f\x80-\xff]/) {
-			$single = &Q_encode_string($single);
+			$single = &q_encode_string($single);
 			$nstr = $nstr . '=?' . $iso8 . '?Q?' . $single . "?=\n";
 		    } else {
 			$nstr = $nstr . $single. "\n";
@@ -129,7 +128,7 @@ sub mime_encode_string ($$$) {
 		$s = substr($str, $point, 1);
 		$point ++;
 
-		$double = &B_encode_string($double);
+		$double = &b_encode_string($double);
 		$nstr = $nstr . '=?' . $iso7 . '?B?' . $double . '?=';
 		$double = '';
 
@@ -152,7 +151,7 @@ sub mime_encode_string ($$$) {
 	    $nstr = $nstr . "\t";
 	}
 	if ($single =~ /[\x00-\x1f\x80-\xff]/) {
-	    $single = &Q_encode_string($single);
+	    $single = &q_encode_string($single);
 	    $nstr = $nstr . '=?' . $iso8 . '?Q?' . $single . "?=\n";
 	} else {
 	    $nstr = $nstr . $single. "\n";
@@ -163,16 +162,102 @@ sub mime_encode_string ($$$) {
 
 sub mime_decode_string ($) {
     my $in = shift;
-    return '' unless $in;
+    return '' if ($in eq '');
     $in =~ s/\?=\s+=\?/?==?/g;
     $in =~ s/(=\?([^?]+)\?(.)\?([^?]+)\?=)/
-      ($$mime_decode_switch{uc($3)})?&{$$mime_decode_switch{uc($3)}}($4):$1/ge;
-#   while ($in =~ /^(.*)=\?([^?]+)\?(.)\?([^?]+)\?=(.*)$/) {
-#	if ($$mime_decode_switch{uc($3)}) {
-#	    $in = $1 . &{$$mime_decode_switch{uc($3)}}($4) . $5;
-#	}
-#   }
+	($$mime_decode_switch{uc($3)})?mime_decode($2, $3, $4):$1/ge;
     return $in;
+}
+
+sub mime_decode($$$) {
+    my ($cs, $bq, $str) = @_;
+    my $ret = &{$$mime_decode_switch{uc($3)}}($4);
+    if ($cs =~ /iso-8859-([2-9])/i) {
+	$ret = iso_8859_to_ctext($ret, $1);
+    } elsif ($cs =~ /cn-gb/i) {
+	$ret = cn_gb_to_ctext($ret);
+    } elsif ($cs =~ /euc-jp/i) {
+	$ret = euc_jp_to_ctext($ret);
+    } elsif ($cs =~ /euc-kr/i) {
+	$ret = euc_kr_to_ctext($ret);
+    } elsif ($cs =~ /shift_jis/i) {
+	$ret = shift_jis_to_ctext($ret);
+    }
+    return $ret;
+}
+
+sub iso_8859_to_ctext ($$) {
+    my ($str, $num) = @_;
+    my @index = ("A", "A", "B", "C", "D", "L", "G", "F", "H", "M");
+    $str =~ s/([\x80-\xff]+)/\e-$index[$num]$1\e-A/g;
+    return $str;
+}
+
+sub cn_gb_to_ctext ($) {
+    my $str = shift;
+    $str =~ s/([\x80-\xff]+)/"\e\$(A" . remove_msb($1) . "\e(B"/ge;
+    return $str;
+}
+
+sub euc_jp_to_ctext ($) {
+    my $str = shift;
+    $str =~ s/((\x8f[\xa0-\xff][\xa0-\xff])+)/"\e\$(D"
+	. remove_msb(remove_ss($1, "\x8f")) . "\e-A"/ge;
+    $str =~ s/(([\xa0-\xff][\xa0-\xff])+)/"\e\$(B"
+	. remove_msb($1) . "\e(B"/ge;
+    $str =~ s/((\x8e[\x80-\xff])+)/"\e)I" . remove_ss($1, "\x8e") . "\e-A"/ge;
+    return $str;
+}
+
+sub euc_kr_to_ctext ($) {
+    my $str = shift;
+    $str =~ s/([\x80-\xff]+)/"\e\$(C" . remove_msb($1) . "\e(B"/ge;
+    return $str;
+}
+
+sub remove_msb ($) {
+    my $str = shift;
+    $str =~ tr/\x80-\xff/\x00-\x7f/;
+    return $str;
+}
+
+sub remove_ss ($$) {
+    my ($str, $si) = @_;
+    $str =~ s/$si//g;
+    return $str;
+}
+
+sub shift_jis_to_ctext ($) {
+    my $str = shift;
+    my $kanji = "[\x81-\x9f\xe0-\xef].";
+    my $kana = "[\xa0-\xdf]";
+
+    $str =~ s/($kanji($kanji|$kana)*$kanji|($kanji)+)/\e\$\(B\1\e\(B/g;
+    $str =~ s/(($kanji)+)/s2j($1)/ge;
+    $str =~ s/($kana)/\e\)I\1/;
+    $str =~ s/($kana)([^\xa0-\xdf]*$)/\1\e-A\2/;
+    return $str;
+}
+
+sub s2j($) {
+    my $str = shift;
+    my ($c1, $c2);
+    my $ret = "";
+
+    while ($str) {
+	($c1, $c2, $str) = unpack('CCa*', $str);
+	if ($c2 >= 0x9f) {
+	    $c1 = $c1 * 2 - ($c1 >= 0xe0 ? 0xe0 : 0x60);
+	    $c2 += 2;
+	} else {
+	    $c1 = $c1 * 2 - ($c1 >= 0xe0 ? 0xe1 : 0x61);
+	    $c2 += 0x60 + ($c2 < 0x7f);
+	}
+	$c1 &= 0x7f;
+	$c2 &= 0x7f;
+	$ret .= pack('CC', $c1, $c2);
+    }
+    return $ret;
 }
 
 ##################################################

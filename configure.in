@@ -10,7 +10,7 @@ dnl
 dnl
 dnl Author:  Internet Message Group <img@mew.org>
 dnl Created: Apr 23, 1997
-dnl Revised: Oct 24, 1997
+dnl Revised: Apr 08, 1998
 dnl
 
 AC_INIT(imget.in)
@@ -19,13 +19,15 @@ dnl Checks for programs.
 AC_PROG_INSTALL()
 AC_CANONICAL_HOST
 
-im_version="version 971024"
-im_revised="Oct 24, 1997"
+im_version="version 980506"
+im_revised="May 06, 1998"
+im_file_attr="O_RDWR|O_CREAT|O_EXCL"
 
 AC_SUBST(im_version)
 AC_SUBST(im_revised)
 AC_SUBST(im_rpop)
 AC_SUBST(im_db_type)
+AC_SUBST(im_file_attr)
 IM_PATH_PERLV_PROGS(im_path_perl, perl perl5, PERL5_NOT_FOUND)
 case "$im_path_perl" in
 ""|PERL5_NOT_FOUND)
@@ -52,13 +54,13 @@ AC_ARG_ENABLE(rpop,
 [im_rpop="-o root -m 4555"],
 [im_rpop="-m 555"],)
 
-AC_OUTPUT(imali:imali.in imcat:imcat.in imcd:imcd.in \
+AC_OUTPUT(imali:imali.in imcat:imcat.in imcd:imcd.in imclean:imclean.in \
 	imget:imget.in imgrep:imgrep.in imhist:imhist.in \
-	imls:imls.in immv:immv.in \
+	imjoin:imjoin.in imls:imls.in immv:immv.in \
 	impack:impack.in impath:impath.in imput:imput.in \
 	impwagent:impwagent.in \
 	imrm:imrm.in imsetup:imsetup.in imsort:imsort.in \
-	imstore:imstore.in \
+	imstore:imstore.in imtar:imtar.in\
 	Makefile:Makefile.in \
 	IM/Address.pm:IM.in/Address.pm.in \
 	IM/Alias.pm:IM.in/Alias.pm.in \
@@ -67,6 +69,7 @@ AC_OUTPUT(imali:imali.in imcat:imcat.in imcd:imcd.in \
 	IM/File.pm:IM.in/File.pm.in \
 	IM/Folder.pm:IM.in/Folder.pm.in \
 	IM/GetPass.pm:IM.in/GetPass.pm.in \
+	IM/Grep.pm:IM.in/Grep.pm.in \
 	IM/Header.pm:IM.in/Header.pm.in \
 	IM/History.pm:IM.in/History.pm.in \
 	IM/Http.pm:IM.in/Http.pm.in \
@@ -83,7 +86,8 @@ AC_OUTPUT(imali:imali.in imcat:imcat.in imcd:imcd.in \
 	IM/Recipient.pm:IM.in/Recipient.pm.in \
 	IM/Scan.pm:IM.in/Scan.pm.in \
 	IM/Smtp.pm:IM.in/Smtp.pm.in \
-	IM/Stdio.pm:IM.in/Stdio.pm.in \
 	IM/TcpTransaction.pm:IM.in/TcpTransaction.pm.in \
-	, chmod 555 imali imcat imcd imget imgrep imhist \
-	imls immv impack impath imput impwagent imrm imsetup imsort imstore)
+	IM/Util.pm:IM.in/Util.pm.in \
+	, chmod 555 imali imcat imcd imclean imget imgrep imhist imjoin\
+	imls immv impack impath imput impwagent imrm imsetup imsort imstore\
+	imtar)

@@ -25,6 +25,7 @@ $Prog = 'imsort';
 use IM::Config;
 use IM::Folder;
 use IM::File;
+use IM::Util;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
@@ -43,10 +44,10 @@ Usage: $Prog [options] +folder [msgs...]
 ";
 
 @OptConfig = (
+    'src;F;;'      => "Set source folder.",
     'field;s;date;'=> "Sort by the specified field.",
     'mode;s;date;' => "Set sort mode to date, num, text or ml.",
     'noharm;b;;'   => "Display the commands but do not actually execute them.",
-    'src;F;;'      => "Set source folder.",
     'verbose;b;;'  => 'With verbose messages.',
     'debug;d;;'    => "With debug message.",
     'help;b;;'     => "Show this message.",
@@ -111,9 +112,9 @@ sub imsort ($$$$) {
     my ($i, $path, $from, $to, $tmp, @msg_paths, @sorted_index);
     my @param = ();
 
-    my $HOLE_PATH = impath($src, 'new');
+    my $HOLE_PATH = get_impath($src, 'new');
 
-    @msg_paths = impath($src, @{$msgs});
+    @msg_paths = get_impath($src, @{$msgs});
 
     foreach $path (@msg_paths){
 	im_die "No file $path in $src. (Nothing was done.)\n"
@@ -186,15 +187,6 @@ sub get_field_value ($$$) {
 	return (stat($path))[9];
     }
     return $_;
-}
-
-sub impath ($@) {
-    my $folder = shift;
-    my @msgs  = @_;
-    my @paths;
-
-    @paths = get_message_paths($folder, @msgs);
-    return wantarray ? @paths : $paths[0];
 }
 
 sub sec_from_epoc ($$$$$$$) {

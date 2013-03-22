@@ -1,7 +1,7 @@
 %subject_substitute_list = (
-		'+ML/mew-dist'  => 's/\[Mew-dist [1-9][0-9]*\] //g',
-		'+ML/installer' => 's/\[installer [1-9][0-9]*\] //g',
-		'+ML/ptl'	=> 's/\[ptl [1-9][0-9]*\] //g',
+		'+ML/mew-dist'  => 's/\[Mew-dist [0-9][0-9]*\] //g',
+		'+ML/installer' => 's/\[installer [0-9][0-9]*\] //g',
+		'+ML/ptl'	=> 's/\[ptl [0-9][0-9]*\] //g',
 		'+ML/j2'	=> 's/j2 Digest //'
 		);
 
@@ -11,7 +11,7 @@ sub scan_sub {
     my($folder, $pattern);
     my($eval_string);
 
-    $folder = $href->{'folder'};
+    $folder = $href->{'folder:'};
     $pattern = $subject_substitute_list{$folder};
 
     if ($pattern ne '') {

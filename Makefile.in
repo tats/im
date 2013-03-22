@@ -31,6 +31,9 @@ siteperl=@im_path_siteperl@
 imdir=$(siteperl)/IM
 RPOP=@im_rpop@
 
+PROG = imali imcat imcd imclean imgrep imhist imjoin imls immv \
+	impack impath imput impwagent imrm imsetup imsort imstore \
+	imtar
 all:
 	@echo everything has been done by configure.
 	@echo you only need to do "make install".
@@ -40,21 +43,8 @@ install:: installbin installdata
 installbin::
 	[ -d $(bindir) ] || \
 		($(mkdir) -p $(bindir) && $(chmod) 755 $(bindir))
-	$(INSTALL) -m 555 imali $(bindir)
-	$(INSTALL) -m 555 imcat $(bindir)
-	$(INSTALL) -m 555 imcd $(bindir)
-	$(INSTALL) -m 555 imgrep $(bindir)
-	$(INSTALL) -m 555 imhist $(bindir)
-	$(INSTALL) -m 555 imls $(bindir)
-	$(INSTALL) -m 555 immv $(bindir)
-	$(INSTALL) -m 555 impack $(bindir)
-	$(INSTALL) -m 555 impath $(bindir)
-	$(INSTALL) -m 555 imput $(bindir)
-	$(INSTALL) -m 555 impwagent $(bindir)
-	$(INSTALL) -m 555 imrm $(bindir)
-	$(INSTALL) -m 555 imsetup $(bindir)
-	$(INSTALL) -m 555 imsort $(bindir)
-	$(INSTALL) -m 555 imstore $(bindir)
+	for f in $(PROG); do \
+		$(INSTALL) -m 555 $${f} $(bindir); done
 	$(INSTALL) $(RPOP) imget $(bindir)
 
 installdata::
@@ -67,17 +57,16 @@ installdata::
 		($(mkdir) -p $(libdir) && $(chmod) 755 $(libdir))
 	for cnf_im in SiteConfig ; do \
 		if test ! -f $(libdir)/$$cnf_im; then \
-			($(cp) cnf.im/$$cnf_im $(libdir)) ; \
+			($(cp) $(srcdir)/cnf.im/$$cnf_im $(libdir)) ; \
 		else \
-			($(cp) cnf.im/$$cnf_im $(libdir)/$$cnf_im.new) ; \
+			($(cp) $(srcdir)/cnf.im/$$cnf_im $(libdir)/$$cnf_im.new) ; \
 		fi ;\
 	done
 	$(chmod) -R 644 $(libdir)/*
 	$(chmod) 755 $(libdir)
 
 clean::
-	$(rm) -f imali imcat imcd imrm imget imgrep imhist imls immv \
-		impack impath imput impwagent imsetup imsort imstore
+	$(rm) -f $(PROG) imget
 	$(rm) -rf IM
 	$(mkdir) IM
 

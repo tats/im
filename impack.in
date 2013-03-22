@@ -25,7 +25,7 @@ $Prog = 'impack';
 use IM::Config;
 use IM::Folder;
 use IM::File;
-use IM::Stdio;
+use IM::Util;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
@@ -79,7 +79,7 @@ sub impack ($) {
 
     chk_folder_existance($folder);          # not return in case false.
 
-    my @paths = impath($folder, 'all');
+    my @paths = get_impath($folder, 'all');
 
     print "packing messages in $opt_src ... " unless $opt_noharm;
     flush('STDOUT') unless $opt_noharm;
@@ -94,38 +94,6 @@ sub impack ($) {
 
     print "done\n" unless $opt_noharm;
     touch_folder($folder) unless $opt_noharm;
-}
-
-##
-## Check folder existance.
-##
-sub chk_folder_existance (@) {
-    my @folders = @_;
-    my $path;
-
-    im_debug("chk_folder_existance: folder: @folders\n") if (&debug('all'));
-
-    foreach (@folders){
-	$path = impath($_);
-
-	im_die("No folder $_. (Nothing was refiled.)\n")
-	    if (!-d $path);
-	im_die("Folder $_ is not writable. (Nothing was refiled.)\n")
-	    if (!-w $path);
-    }
-    im_debug("chk_folder_existance: OK.\n") if (&debug('all'));
-}
-
-sub impath ($@) {
-    my $folder = shift;
-    my @msgs  = @_;
-    my @paths;
-
-    im_debug("impath: folder: $folder msgs: @msgs\n") if (&debug('all'));
-    @paths = get_message_paths($folder, @msgs);
-    im_debug("impath: paths: @paths\n") if (&debug('all'));
-
-    return wantarray ? @paths : $paths[0];
 }
 
 ### Local Variables:

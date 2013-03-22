@@ -20,8 +20,8 @@ package IM::File;
 require 5.003;
 require Exporter;
 
-use IM::Config;
-use IM::History;
+use IM::Config qw(expand_path mail_path news_path msgdbfile);
+use IM::Util;
 use File::Copy;
 use integer;
 use strict;
@@ -61,7 +61,7 @@ sub im_rename ($$) {
 	if (!($ret = rename($p1, $p2))){
 	    $ret = copy($p1, $p2) && unlink($p1);
 	}
-	rename_history($id, $m1, $m2)
+	history_rename($id, $m1, $m2)
 	    if (USE_DB() && $ret && $id);
     }
     return $ret;
@@ -89,7 +89,7 @@ sub im_link ($$) {
 	if (win95p() || os2p() || wntp() || !($ret = link($p1, $p2))){
 	    $ret = copy($p1, $p2);
 	}
-	link_history($id, $m1, $m2)
+	history_link($id, $m1, $m2)
 	    if (USE_DB() && $ret && $id);
     }
     return $ret;
@@ -110,12 +110,12 @@ sub im_unlink ($)
 	$id = get_msg_info($p1);
     }
 
-    if ($main::opt_noharm) {
+    if ($main::opt_noharm || $main::opt_verbose) {
 	print "unlink $p1\n";
 	$ret = 1;
     } else {
 	$ret = unlink($p1);
-	delete_history($id, $m1)
+	history_delete($id, $m1)
 	    if (USE_DB() && $ret && $id);
     }
     return $ret;
@@ -163,9 +163,14 @@ sub expand_path_and_msg ($) {
 }
 
 sub USE_DB () {
-    if (!$CHECKED){
+    if (!$CHECKED) {
 	$CHECKED = 1;
-	open_history(1) if ($USE_DB = msgdbfile());
+	if ($USE_DB = msgdbfile()) {
+	    require IM::History;
+	    import IM::History qw(history_open history_delete
+				  history_rename history_link);
+	    history_open(1);
+	}
     }
     return $USE_DB;
 }

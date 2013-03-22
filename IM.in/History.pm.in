@@ -21,7 +21,8 @@ require 5.003;
 require Exporter;
 
 use Fcntl;
-use IM::Config;
+use IM::Config qw(msg_mode msgdbfile msgdbtype);
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -29,9 +30,9 @@ use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter);
 @EXPORT = qw(
 	LookUpAll LookUpMsg
-	open_history close_history
-	store_history lookup_history delete_history dump_history
-	rename_history link_history
+	history_open history_close
+	history_store history_lookup history_delete history_dump
+	history_rename history_link
 );
 
 use vars qw($DBtype $locked $nodbfile $DB_HASH %History);
@@ -47,7 +48,7 @@ sub LookUpMsg  {  0 }
 #sub LookUpDate {  1 }
 
 
-sub open_history ($) {
+sub history_open ($) {
     my ($with_lock) = @_;
     $DBtype = msgdbtype();	# package global
     unless ($DBtype) {
@@ -85,7 +86,11 @@ sub open_history ($) {
     } elsif ($DBtype eq 'NDBM') {
 	$db = tie %History, 'NDBM_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
     } elsif ($DBtype eq 'SDBM') {
-	$db = tie %History, 'SDBM_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
+	if (&win95p || &os2p){
+	    $db = tie %History, 'SDBM_File', $dbfile, O_CREAT|O_RDWR|O_BINARY, &msg_mode(0);
+	} else {
+	    $db = tie %History, 'SDBM_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
+	}
     }
 
     unless ($db) {
@@ -113,12 +118,13 @@ sub open_history ($) {
 	    return -1;
 	}
     }
-
-    unless (flock (HIST_FH, LOCK_EX | LOCK_NB)) {
-	im_warn "history: waiting for write lock ($!)\n";
-	unless (flock (HIST_FH, LOCK_EX)) {
-	    im_err "history: flock ($!)\n";
-	    return -1;
+    if (! &win95p ){
+	unless (flock (HIST_FH, LOCK_EX | LOCK_NB)) {
+	    im_warn "history: waiting for write lock ($!)\n";
+	    unless (flock (HIST_FH, LOCK_EX)) {
+		im_err "history: flock ($!)\n";
+		return -1;
+	    }
 	}
     }
     $locked = 1;
@@ -126,13 +132,15 @@ sub open_history ($) {
 }
 
 
-sub close_history () {
+sub history_close () {
     if ($nodbfile) {
 	im_err("no database specified.\n");
 	return;
     }
-    if ($locked) {
-	flock(HIST_FH, LOCK_UN);
+    if (! &win95p ){
+	if ($locked) {
+	    flock(HIST_FH, LOCK_UN);
+	}
     }
     untie %History;
     if ($locked) {
@@ -142,7 +150,7 @@ sub close_history () {
 }
 
 
-sub lookup_history ($$) {
+sub history_lookup ($$) {
     if ($nodbfile) {
 	im_err("no database specified.\n");
 	return ();
@@ -165,7 +173,7 @@ sub lookup_history ($$) {
     }
 }
 
-sub store_history ($$) {
+sub history_store ($$) {
     if ($nodbfile) {
 	im_err("no database specified.\n");
 	return -1;
@@ -183,7 +191,7 @@ sub store_history ($$) {
     $History{$msgid} = $folder;
 }
 
-sub delete_history ($$) {
+sub history_delete ($$) {
     if ($nodbfile) {
 	im_err("no database specified.\n");
 	return -1;
@@ -219,7 +227,7 @@ sub delete_history ($$) {
 }
 
 
-sub dump_history () {
+sub history_dump () {
     if ($nodbfile) {
 	im_err("no database specified.\n");
 	return;
@@ -230,7 +238,7 @@ sub dump_history () {
     }
 }
 
-sub rename_history ($$$) {
+sub history_rename ($$$) {
     if ($nodbfile) {im_err("no database specified.\n"); return;}
 
     my ($id, $m1, $m2) = @_;
@@ -249,7 +257,7 @@ sub rename_history ($$$) {
     return 0;
 }
 
-sub link_history ($$$) {
+sub history_link ($$$) {
     if ($nodbfile) {im_err("no database specified.\n"); return;}
 
     my ($id, $m1, $m2) = @_;
@@ -268,7 +276,7 @@ sub link_history ($$$) {
     return 0;
 }
 
-sub unlink_history ($$) {
+sub history_unlink ($$) {
     if ($nodbfile) {im_err("no database specified.\n"); return;}
 
     my ($id, $m1) = @_;

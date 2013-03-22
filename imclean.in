@@ -1,0 +1,167 @@
+#! @im_path_perl@
+################################################################
+###
+###				 imclean
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "imclean @im_version@";
+
+$Prog = 'imclean';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Util;
+use IM::Folder;
+use IM::File;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_src $opt_noharm $opt_quiet $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+$Prog :: Internet Message Garbage Cleanup
+$VERSION
+
+Usage: $Prog [options] [msgs...]
+";
+
+@OptConfig = (
+    'src;F;;'     => "Set a folder to be cleaned up.",
+    'noharm;b;;'  => "Do not delete files, show what will be performed.",
+    'quiet;b;;'   => "Do not show any messages.",
+    'verbose;b;;' => 'With verbose messages.',
+    'debug;d;;'   => "With debug message.",
+    'help;b;;'    => "Show this message.",
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+my @msgs = @ARGV;
+@msgs = ('all') if (!@ARGV);
+
+imclean($opt_src, @msgs);
+exit $EXIT_SUCCESS;
+
+##
+## work horse
+
+sub imclean ($@) {
+    my ($folder, @msgs) = @_;
+    my (@paths, $set, $HANDLE);
+
+    if ($folder !~ /^%/) {
+	@paths = get_message_paths($folder, @msgs);
+	if (scalar(@paths) == 0) {
+	    im_warn("no msgs in $folder\n");
+	    return;
+	}
+    } else {
+	# IMAP folder (%folder[:[user[/auth]]@server])
+	require IM::Imap && import IM::Imap;
+	require IM::GetPass && import IM::GetPass;
+	my ($ifld, $auth, $user, $host);
+
+	$ifld = $folder;
+	if ($ifld !~ /[:\@]/) {
+	    # Use ImapAccount spec, unless user or host is specified.
+	    (my $dummy, $auth, $user, $host) = imap_spec('');
+	    $ifld =~ s/^%//;
+	} else {
+	    ($ifld, $auth, $user, $host) = imap_spec($ifld);
+	}
+
+	my $pass = '';
+	my $agtfound = 0;
+	my $interact = 0;
+	if (&usepwagent()) {
+	    $pass = &loadpass('imap', $auth, $host, $user);
+	    $agtfound = 1 if ($pass ne '');
+	}
+	if ($pass eq '' && &usepwfiles()) {
+	    $pass = &findpass('imap', $auth, $host, $user);
+	}
+	if ($pass eq '') {
+	    $pass = &getpass('Password: ');
+	    $interact = 1;
+	}
+
+	im_warn("accessing IMAP/$auth:$user\@$host\n") if (&verbose);
+
+	(my $rc, $HANDLE) = imap_open($auth, $host, $user, $pass);
+	if ($rc < 0) {
+	    im_warn("IMAP connection was not established.\n")
+		if (&debug('imap') || &verbose);
+	    &savepass('imap', $auth, $host, $user, '')
+		if ($agtfound && &usepwagent());
+	    exit $EXIT_ERROR;
+	}
+	&savepass('imap', $auth, $host, $user, $pass)
+	    if ($interact && $pass ne '' && &usepwagent());
+	my $exists = imap_select($HANDLE, $ifld, 1);
+	if ($exists < 0) {
+	    imap_close($HANDLE);
+	    im_die("can't access to $folder\n");
+	} elsif ($exists == 0) {
+	    imap_close($HANDLE);
+	    im_warn("no msgs in $folder\n");
+	    return;
+	}
+	$set = imap_range2set($HANDLE, @msgs);
+    }
+
+    print "unlinking msgs in $folder ... " unless ($opt_noharm || $opt_quiet);
+    print "\n" if $opt_verbose;
+    flush('STDOUT') unless $opt_noharm;
+
+    if ($folder !~ /^%/) {
+	my $i = 0;
+	foreach (@paths) {
+	    im_die("invalid message specification (unlinked $i message(s))\n")
+		if (!-f $_);
+	    im_unlink($_);
+	    $i++;
+	}
+    } else {
+	imap_delete($HANDLE, $set);
+	imap_close($HANDLE);
+    }
+
+    print "done\n" unless ($opt_noharm || $opt_quiet);
+    if ($folder !~ /^%/) {
+	touch_folder($folder) unless $opt_noharm;
+    }
+}
+
+### Local Variables:
+### mode: perl
+### End:

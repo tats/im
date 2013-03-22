@@ -20,7 +20,8 @@ package IM::Folder;
 require 5.003;
 require Exporter;
 
-use IM::Config;
+use IM::Config qw(expand_path context_file inbox_folder folder_mode);
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -28,7 +29,8 @@ use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter);
 @EXPORT = qw(cur_folder set_cur_folder folder_info
 	message_number message_range message_name
-	get_message_paths create_folder touch_folder);
+	get_message_paths create_folder touch_folder
+        chk_folder_existance chk_msg_existance get_impath);
 
 =head1 NAME
 
@@ -381,6 +383,58 @@ sub touch_folder ($) {
 	my $now = time;	# XXX
 	utime ($now, $now, $dir);
     }
+}
+
+##
+## Check folder existance.
+##
+sub chk_folder_existance (@) {
+    my @folders = @_;
+    my $path;
+
+    im_debug("chk_folder_existance: folder: @folders\n") if (&debug('all'));
+
+    foreach (@folders){
+	next if /^%/;		# skip IMAP folders
+	$path = get_impath($_);
+
+	if (-e $path) {
+	    im_die "folder $_ is not writable. (Nothing was refiled.)\n"
+		if (!-w $path);
+	} else {
+	    if (create_folder($path) == 0) {
+		im_warn "created folder $_.\n";
+	    } else {
+		im_die "cannot create folder $_. (Nothing was refiled.)\n";
+	    }
+	}
+    }
+    im_debug("chk_folder_existance: OK.\n") if (&debug('all'));
+}
+
+sub chk_msg_existance ($@) {
+    my $folder = shift;
+    my @paths  = get_impath($folder, @_);
+
+    im_debug("chk_msg_existance: folder: $folder msg: @_\n") if (&debug('all'));
+
+    foreach (@paths){
+	im_die "message specification error in $folder. (Nothing was refiled.)\n"
+	    if (!-f $_);
+    }
+    im_debug("chk_msg_existance: OK.\n") if (&debug('all'));;
+}
+
+sub get_impath ($@) {
+    my $folder = shift;
+    my @msgs  = @_;
+    my @paths;
+
+    im_debug("impath: folder: $folder msgs: @msgs\n") if (&debug('all'));;
+    @paths = get_message_paths($folder, @msgs);
+    im_debug("impath: paths: @paths\n") if (&debug('all'));;
+
+    return wantarray ? @paths : $paths[0];
 }
 
 1;

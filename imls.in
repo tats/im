@@ -23,19 +23,21 @@ $Prog = 'imls';
 ##
 
 use IM::Config;
+use IM::Util;
 use IM::Scan;
-use IM::Stdio;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
 	    @servers
 	    $opt_form $opt_jissafe $opt_width $opt_thread @opt_src
-	    $opt_indent $opt_grep $opt_verbose $opt_debug $opt_help
-	    $opt_buffer);
+	    $opt_indent $opt_grep $opt_delimiter $opt_casefold
+	    $opt_verbose $opt_debug $opt_quiet $opt_help $opt_buffer);
 
 ##
 ## Environments
 ##
+
+$opt_casefold = 'yes';	# default case-insensitive
 
 my $FIRST = 0;
 my $LAST = 100000; #xxx
@@ -55,18 +57,22 @@ Usage :: $Prog [options] [+folder] [range]
 ";
 
 @OptConfig = (
+    'src;F@;;'    => 'Message source',
     'form;s;;'    => 'Scan format',
+    'buffer;B;;'  => 'Make output data buffered',
     'jissafe;b;;' => 'Safe manner for JIS',
     'width;i;;'   => 'Width of result',
     'thread;b;;'  => 'Make threads',
-    'src;F@;;'    => 'Message source',
     'indent;i;;'  => "Width of thread indent",
     'grep;s;;'    => "Grep pattern for vscan",
+    'casefold;b;on;' => 'Case sensitivity'.
+	"\n\t\t(This option affects both fieldname and pattern.)",
+    'delimiter;s;\n\n|\n----\n;' => 'Mail header delimiter',
+    'dupchecktarget,D;s;;'    => 'Duplicate Check Target',
+    'quiet;b;;'   => 'Suppress informational messages.',
     'verbose;b;;' => 'With verbose messages.',
     'debug;d;;'   => "With debug message.",
-    'buffer;B;;'  => 'Make output data buffered',
     'help;b;;'    => 'Show this message',
-    'dupchecktarget;s;;'    => 'Duplicate Check Target',
     );
 
 ##
@@ -96,6 +102,7 @@ if (scalar(@opt_src) < 1) {
     im_die("must specify one or more folders.\n");
 } elsif ($opt_grep) {
     require IM::Folder && import IM::Folder;
+    require IM::Grep && import IM::Grep;
     &vscan();
     exit $EXIT_SUCCESS;
 } else {
@@ -104,11 +111,11 @@ if (scalar(@opt_src) < 1) {
     }
     $_ = $opt_src[0];
     if (/^[+=.\/~]/) {
-	require IM::Folder && import IM::Folder;
-	&local_files($_, @ARGV);
+	require IM::Folder && import IM::Folder qw(get_message_paths);
+	local_files($_, @ARGV);
     } elsif (/^-(.*)$/) {
 	require IM::Nntp && import IM::Nntp;
-	&nntp_messages($1, @ARGV);
+	nntp_messages($1, @ARGV);
     } elsif (/^(\%.*)$/) {
 	require IM::Imap && import IM::Imap;
 	require IM::GetPass && import IM::GetPass;
@@ -146,7 +153,7 @@ sub local_files ($@) {
     foreach $num (get_message_paths($folder, @arg)) {
 	if ( -f $num ) {
 	    %Head = &get_header($num);
-	    $FIRST = $Head{'number'} if $FIRST == 0;
+	    $FIRST = $Head{'number:'} if $FIRST == 0;
 	    if ($opt_thread) {
 		&make_thread(%Head);
 	    } else {
@@ -155,7 +162,7 @@ sub local_files ($@) {
 	    }
 	}
     }
-    $LAST = $Head{'number'} if ($LAST == 100000);
+    $LAST = $Head{'number:'} if ($LAST == 100000);
 }
 
 ############################################
@@ -168,7 +175,7 @@ sub nntp_messages ($@) {
     my ($resp, $start, $end, $rc);
 #   my ($num, $subj, $from, $date, $id, $ref, $num1, $num2);
 
-    ($newsgroup, my $srvs) = &nntp_spec($newsgroup);
+    ($newsgroup, my $srvs) = nntp_spec($newsgroup, nntpservers());
     local(@servers) = split(',', $srvs);
     do {
 	if (($rc = &nntp_open(\@servers, 0)) < 0) {
@@ -222,8 +229,8 @@ sub nntp_messages ($@) {
 	    undef %Head;
 	    my $h = nntp_head_as_string($i);
 	    &store_header(\%Head, $h);
-	    $Head{'number'} = $i;
-	    $Head{'folder'} = "-$newsgroup/$i";
+	    $Head{'number:'} = $i;
+	    $Head{'folder:'} = "-$newsgroup/$i";
 	    &parse_header(\%Head);
 	    $Head{'body:'}      = '';
 	    if ($opt_thread) {
@@ -241,7 +248,7 @@ sub nntp_messages ($@) {
 	    undef %Head;
 	    my @overview = split('\t', $resp);
 
-	    $Head{'number'}     = $overview[0];
+	    $Head{'number:'}    = $overview[0];
 	    $Head{'subject'}    = $overview[1];
 	    $Head{'from'}       = $overview[2];
 	    $Head{'date'}       = $overview[3];
@@ -276,7 +283,7 @@ sub make_thread {
     my %Head = @_;
     my $ref = $Head{'references:'};
     my $id  = $Head{'message-id'}; # not cooked
-    my $num = $Head{'number'};
+    my $num = $Head{'number:'};
 
     my($x, $y);
 
@@ -346,25 +353,36 @@ sub disp_thread ($$) {
 sub vscan () {
     my $num = 1;
     my $folder;
+    my $eval_string;
 
-    foreach $folder (@opt_src) {
-	my $folder_dir = expand_path($folder);
-	im_die("unable to change directory to $folder_dir: $!\n")
-	    unless chdir($folder_dir);
+    $eval_string = parse_expression($opt_grep, $opt_casefold);
 
-	my $command = "imgrep --expression='$opt_grep' $folder |";
-        open(PICK, $command) || im_die("can't exec $command\n");
-	while(<PICK>) {
-	    chomp;
-	    if ( -f $_ ) {
+    binmode(STDOUT) if (win95p());
+    foreach (@opt_src) {
+	my ($folder, $ranges) = (/([^:]+)(?::)?(.*)?/);
+	my $folder_dir;
+	my @ranges = split(',', $ranges);
+	my @messages = ();
+
+	if ( $folder =~ /^\-/ ) {
+	    im_warn("Newsspool $folder search not supported (ignored)\n");
+	    next FOLDER;
+	}
+
+	@ranges = ( $ranges ? @ranges : 'all' );
+
+	$folder_dir = expand_path($folder);
+
+	@messages = grep_folder($folder_dir, $eval_string, @ranges);
+	foreach ( @messages ) {
+	    if ( -f "$folder_dir/$_" ) {
 		my %Head = &get_header("$folder_dir/$_");
-		$Head{'pnum'} = $Head{'number'};
-		$Head{'number'} = $num;
+		$Head{'pnum'} = $Head{'number:'};
+		$Head{'number:'} = $num;
 		disp_msg(\%Head, $opt_grep);
   		$num++;
 	    }
 	}
-        close(PICK);
     }
 }
 
@@ -451,9 +469,10 @@ sub get_nntp_message_range ($$@) {
 
 sub imap_messages ($@) {
     my ($folder, @ranges) = @_;
-    my ($host, $user, $auth);
+    my ($auth, $user, $host);
 
     if ($folder !~ /[:\@]/) {
+	# Use ImapAccount spec, unless user or host is specified.
 	(my $dummy, $auth, $user, $host) = imap_spec('');
 	$folder =~ s/^%//;
     } else {
@@ -477,7 +496,8 @@ sub imap_messages ($@) {
 
 #   im_warn("accessing IMAP/$auth:$user\@$host\n") if (&verbose);
 
-    if (&imap_open($auth, $host, $user, $pass) < 0) {
+    my ($rc, $HANDLE) = &imap_open($auth, $host, $user, $pass);
+    if ($rc < 0) {
 #	im_warn("IMAP connection was not established.\n")
 #	  if (&debug("imap") || &verbose);
 	&savepass('imap', $auth, $host, $user, '')
@@ -487,21 +507,21 @@ sub imap_messages ($@) {
     }
     &savepass('imap', $auth, $host, $user, $pass)
 	if ($interact && $pass ne '' && &usepwagent());
-    my $exists = &imap_select($folder, 1);
+    my $exists = &imap_select($HANDLE, $folder, 1);
     if ($exists < 0) {
-	&imap_close;
+	&imap_close($HANDLE);
 	im_warn("can't select $folder\@$host.\n");
 	$scan_count = -1;
 	return -1;
     }
     if ($exists > 0) {
-	if (($scan_count = &imap_scan_folder($folder, @ranges)) < 0) {
-	    &imap_close;
+	if (($scan_count = &imap_scan_folder($HANDLE, $folder, @ranges)) < 0) {
+	    &imap_close($HANDLE);
 	    im_warn("IMAP folder scanning error.\n");
 	    return -1;
 	}
     }
-    &imap_close;
+    &imap_close($HANDLE);
     return 0;
 }
 

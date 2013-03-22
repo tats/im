@@ -25,6 +25,7 @@ $Prog = 'imget';
 use IM::Config;
 use IM::MsgStore;
 use IM::Scan;
+use IM::Util;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @EnvConfig @OptConfig
@@ -53,9 +54,17 @@ Usage: $Prog [options]
     );
 
 @OptConfig = (
-    'quiet;b;;'        => 'No informational messages.',
+    'src;s;;' =>
+	"Message source: 'local[:path_of_mbox]'\n" .
+	"\t\t\t\t'pop[/APOP|/RPOP|/POP][:user][\@host]'\n" .
+	"\t\t\t\t'imap[/AUTH|/LOGIN][:user][\@host]'\n" .
+	"\t\t\t\t'nntp:group[\@host]' or\n" .
+	"\t\t\t\t'stdin'" ,
+    'dst;s;+inbox;'    =>
+	'Message destination: "+folder" or "=locally.saved.news".',
     'noscan;b;;'       => 'No scan listings.',
     'form;s;;'	       => 'Scan format',
+    'buffer;B;;'       => 'Make output data buffered',
     'jissafe;b;;'      => 'Safe manner for JIS',
     'width;i;;'        => 'Width of result for scan listings.',
 #   'thread;b;;'       => 'Make threads',
@@ -69,23 +78,16 @@ Usage: $Prog [options]
     'protokeep;s;UIDL;'=> "Protocol type to use for keeping messages on POP.\n".
 	"\t\t(UIDL, LAST, STATUS, MSGID)\n" .
 	"\t\tTimed out deletion is not supported with LAST.",
+    'ignorepostpet;b;;'=> 'Do not get messages for PostPet (effective w/ POP)',
     'usecl;b;;Obey_CL' => "Use value of Content-Length header for delimitation".
 	".\n\t\t(effective only if source of messages is local).\n" ,
     'count;i;;'        => 'Number of messages to be gotten in a process (NNTP)',
-    'src;s;;' =>
-	"Message source: 'local[:path_of_mbox]'\n" .
-	"\t\t\t\t'pop[/APOP|/RPOP|/POP][:user][\@host]'\n" .
-	"\t\t\t\t'imap[/AUTH|/LOGIN][:user][\@host]'\n" .
-	"\t\t\t\t'nntp:group[\@host]' or\n" .
-	"\t\t\t\t'stdin'" ,
-    'dst;s;+inbox;'    =>
-	'Message destination: "+folder" or "=locally.saved.news".',
     'mode;s;get;'      => 'Processing mode: "get", "from" or "check".',
     'assoc;s;;'        => "Association list: dst1=src1;dst2=src2;...\n" .
 	"\t\tThis overrides --dst and --src options.",
+    'quiet;b;;'        => 'Suppress informational messages.',
     'verbose;b;;'      => 'With verbose messages.',
     'debug;d;;'        => "With debug message.",
-    'buffer;B;;'  => 'Make output data buffered',
     'help;b;;'         => 'Display this help message.',
     );
 
@@ -193,7 +195,7 @@ sub get_sub {
 	$msgs = &pop_get_msg($src, $dst, $mode);
     } elsif ($src =~ /^imap/i) {
 	require IM::Imap && import IM::Imap;
-	$msgs = &imap_get_msg($src, $dst, $mode);
+	$msgs = &imap_get_msg($src, $dst, $mode, $opt_count);
     } elsif ($src =~ /^nntp/i || $src =~ /^news/i) {
 	require IM::Nntp && import IM::Nntp;
 	$msgs = &nntp_get_msg($src, $dst, $mode, $opt_count);

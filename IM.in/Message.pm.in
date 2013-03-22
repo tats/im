@@ -20,13 +20,10 @@ package IM::Message;
 require 5.003;
 require Exporter;
 
-use IM::Config;
-use IM::Address;
-use IM::Alias;
-use IM::EncDec;
-use IM::Header;
-use IM::Iso2022jp;
-use IM::Japanese;
+use IM::Util;
+use IM::Address qw(extract_addr replace_addr fetch_addr);
+use IM::Alias qw(alias_lookup alias_host_completion);
+use IM::Header qw(gen_message_id gen_date header_value add_header hdr_cat);
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -186,9 +183,16 @@ sub rewrite_addr_list ($$$;$) {
 	    }
 	    if ($a !~ /[\@%!:]/ && ($b = &alias_lookup($a)) ne '') {
 ## if ISO2022JP
-		$b = &conv_iso2022jp($b)
-		  if ($main::Iso2022jp_code_conversion);
+		if ($main::Iso2022jp_code_conversion) {
+		    require IM::Japanese;
+		    import IM::Japanese qw(conv_iso2022jp);
+
+		    $b = &conv_iso2022jp($b);
+		}
 		if ($main::Iso2022jp_header_mime_conv) {
+		    require IM::Iso2022jp;
+		    import IM::Iso2022jp qw(struct_iso2022jp_mimefy);
+
 		    my $bb = &struct_iso2022jp_mimefy($b);
 		    $b = $bb if ($bb ne '');
 		}
@@ -209,7 +213,7 @@ sub rewrite_addr_list ($$$;$) {
 		    $b = "$a\@$main::Default_to_domain_name";
 		    $addr = &replace_addr($addr, $a, $b);
 		}
-	    } elsif ($b = &host_completion($a)) {
+	    } elsif ($b = alias_host_completion($a)) {
 		$addr = &replace_addr($addr, $a, $b);
 	    }
 	}
@@ -287,7 +291,7 @@ sub put_header (*$$$) {
 	    next hdr if ($line =~ /Message-Id:/i && $main::NoMsgIdForNews);
 	    if ($main::Obey_MTA_domain
 	      && ($line =~ /^(From|Sender|Reply-To):\s*(.*)/i)) {
-		my $val = &rewrite_addr_list(1, $2, 1);
+		my $val = &rewrite_addr_list($Header, 1, $2, 1);
 		return -1 if ($val eq '');
 		$line = "$1: $val";
 	    }
@@ -300,7 +304,8 @@ sub put_header (*$$$) {
 	    return -1 unless (print CHAN "$line");
     }
     if ($proto =~ /nntp/i && !&header_value($Header, 'Path')) {
-	return -1 unless (print CHAN "Path: $main::Login$crlf");
+#	return -1 unless (print CHAN "Path: $main::Login$crlf");
+	return -1 unless (print CHAN "Path: not-for-mail$crlf");
     }
     im_debug("put_header finished: no error\n")
       if (&debug('header') || &debug('put'));
@@ -384,6 +389,8 @@ sub body_base64_encode ($) {
     my $line = '';
     my ($i, $tmp, @Body_tmp);
 
+    require IM::EncDec && import IM::EncDec qw(b_encode_string);
+
     for ($i = 0; $i <= $#$Body; $i++) {
 	$line .= $$Body[$i];
 	$line .= "\n" if ($line !~ /\n$/);
@@ -460,7 +467,7 @@ sub put_mimed_bcc (*$$$$$$) {
     return -1 unless (print CHAN "From: $main::Sender_line$crlf");
     print CHAN "To: blind-copy-recipients:;$crlf";
     print CHAN "X-Dispatcher: $main::VERSION$crlf";
-    if ($subj = &header_value($Header, 'Subject')) {
+    if (($subj = &header_value($Header, 'Subject')) ne '') {
 	print CHAN "Subject: Bcc: $subj$crlf";
     } else {
 	print CHAN "Subject: Blind Carbon Copy$crlf";
@@ -562,7 +569,7 @@ sub put_mimed_error_notify (*$$$$$$$$;$) {
     return -1 unless (print CHAN "To: $main::Sender_line$crlf");
     print CHAN "From: Imput-Error-Report$crlf";
     print CHAN "X-Dispatcher: $main::VERSION$crlf";
-    if ($subj = &header_value($Header, 'Subject')) {
+    if (($subj = &header_value($Header, 'Subject')) ne '') {
 	print CHAN "Subject: Returned message: $subj$crlf";
     } else {
 	print CHAN "Subject: Returned message$crlf";

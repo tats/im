@@ -96,6 +96,12 @@ command tells you what will happen if not specified. It's like
 'immv' ('refile')
 	Move message(s) from the source folder to the destination folder(s).
 
+'imrm'
+	Move message(s) from the source folder to the +trash folder.
+
+'imclean'
+	Remove message(s).	
+
 'imgrep' ('pick')
 	Enumerate message(s) matched given patterns.
 
@@ -111,9 +117,6 @@ command tells you what will happen if not specified. It's like
 
 'imsort' ('sortm')
 	Sort messages in a folder.
-
-'imrm'
-	Remove message(s).
 
 'imhist'
 	Treat history database.

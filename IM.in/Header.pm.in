@@ -20,7 +20,7 @@ package IM::Header;
 require 5.003;
 require Exporter;
 
-use IM::Config;
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);

@@ -19,9 +19,9 @@ my $PM_VERSION = "IM::TcpTransaction.pm @im_version@";
 package IM::TcpTransaction;
 require 5.003;
 require Exporter;
-
+use IM::Config qw(dns_timeout connect_timeout command_timeout rcv_buf_siz);
 use Socket;
-use IM::Config;
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -146,7 +146,7 @@ sub connect_server ($$$) {
 		return '';
 	    }
 	} else {
-	    alarm(60) unless win95p();
+	    alarm(dns_timeout()) unless win95p();
 	    $0 = progname() . ": gethostbyname($s)";
 	    ($he_name, $he_alias, $he_type, $he_len, @he_addrs)
 	      = gethostbyname ($s);
@@ -180,6 +180,12 @@ sub connect_server ($$$) {
 		    im_err("socket creation failed: $!.\n");
 		    return '';
 		}
+		if (defined(rcv_buf_siz())) {
+                    unless (setsockopt(SOCK, SOL_SOCKET, SO_RCVBUF, rcv_buf_size())) {
+                        im_err("setsockopt failed: $!.\n");
+                        return '';
+		    }
+                }
 	    }
 
 	    if ($family == AF_INET) {
@@ -188,7 +194,7 @@ sub connect_server ($$$) {
 		$sin = pack('CCnN', 1+1+2+4+16, $family, $port, 0) . $he_addr;
 	    }
 	    im_notice("opening $proto session to $s($port).\n");
-	    alarm(60) unless win95p();
+	    alarm(connect_timeout()) unless win95p();
 	    $0 = progname() . ": connecting to $s with $proto";
 	    if (connect (SOCK, $sin)) {
 		alarm(0) unless win95p();
@@ -254,7 +260,7 @@ sub tcp_command ($$$) {
 	$0 = progname() . ": greeting ($Cur_server)";
     }
     do {
-	alarm(300) unless win95p();
+	alarm(command_timeout()) unless win95p();
 	$! = 0;
 	$resp = <$CHAN>;
 	unless (win95p()) {
@@ -302,7 +308,7 @@ sub send_command ($$$) {
     } else {
 	$0 = progname() . ": greeting ($Cur_server)";
     }
-    alarm(300) unless win95p();
+    alarm(command_timeout()) unless win95p();
     $! = 0;
     $resp = <$CHAN>;
     unless (win95p()) {
@@ -337,7 +343,7 @@ sub next_response ($) {
     my $CHAN = shift;
     my $resp;
 
-    alarm(300) unless win95p();
+    alarm(command_timeout()) unless win95p();
     $! = 0;
     $resp = <$CHAN>;
     unless (win95p()) {
@@ -422,7 +428,7 @@ sub priv_sock () {
 }
 
 sub alarm_func {
-#   no operation
+    im_die("connection error\n");
 }   
 
 1;

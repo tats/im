@@ -24,6 +24,7 @@ $Prog = 'imcd';
 
 use IM::Config;
 use IM::Folder;
+use IM::Util;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig

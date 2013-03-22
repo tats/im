@@ -80,7 +80,7 @@ ToDomain=_domain_when_domain_part_is_omitted_
 
 ## imget/imls specific
 #ScanSbr=scan.sbr		# hook for special processing (rel. to ~/.im/)
-#Form=%5n %m%d %-14A %-18S %b	# default format for scanning
+#Form=%+5n %m%d %-14A %-18S %b	# default format for scanning
 #AllowCRLF=no			# saved messages may contain CRLF (DOS style)
 #Width=80			# default width for scanning
 #JisSafe=on			# escape seq. of JIS char. should be managed
@@ -100,6 +100,8 @@ ToDomain=_domain_when_domain_part_is_omitted_
 #NntpHistory=newshist		# to save last state (relative to ~/.im/)
 #MBoxStyle=qmail		# if folder style mbox of qmail is used
 #Imget.Src=local:${HOME}/MailDir# in case of qmail
+#UseCL=no			# Use value of Content-Length header
+#NoSync=no			# Do not need fsync(2) on writing file
 
 #PopAccount=/APOP@localhost	# account info for POP access
 #PopAccount=user/APOP@host	# account info with user name
@@ -107,9 +109,10 @@ ToDomain=_domain_when_domain_part_is_omitted_
 #Keep=7		 		# preserve read messages on server
 #ProtoKeep=UIDL			# how to know which message is unread
 				# (UIDL, LAST, STATUS, MSGID)
+#IgnorePostPet=yes		# leave messages for PostPet on mbox (POP only)
 
-#ImapAccount=@localhost/AUTH	# account info for IMAP access
-#ImapAccount=user@host/AUTH	# account info with user name
+#ImapAccount=/AUTH@localhost	# account info for IMAP access
+#ImapAccount=user/AUTH@host	# account info with user name
 #HttpProxy=proxy-server:8080	# proxy server for HTTP access
 #NoProxy=http://.*my.domain/	# URL regex not to use Proxy server
 #UsePwAgent=yes			# use password agent
@@ -123,6 +126,7 @@ ToDomain=_domain_when_domain_part_is_omitted_
 
 ## imput specific
 #FccDir=$MailDir		# directory for FCC folders
+#QueueDir=queue			# directory for to store messages to be sent
 #MsgIdDomain=${HOST}		# if you want to use FQDN of dispatching host
 #ObeyMTAdomain=yes		# do not append domainpart to addresses by imput
 #NoMsgIdForNews=yes		# do not insert Message-Id: when posting as news

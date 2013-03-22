@@ -23,11 +23,12 @@ $Prog = 'imali';
 ##
 
 use IM::Config;
-use IM::Alias;
+use IM::Util;
+use IM::Alias qw(alias_open alias_list_mail alias_lookup alias_close);
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
-	    $opt_aliasesfile $opt_verbose $opt_debug $opt_help);
+	    $opt_file $opt_verbose $opt_debug $opt_help);
 
 ##
 ## Environments
@@ -41,7 +42,7 @@ Usage: $Prog [options] [target...]
 ";
 
 @OptConfig = (
-    'aliasesfile;s;;' => "Set aliases file.",
+    'file;s;;'    => "Set aliases file.",
     'verbose;b;;' => 'With verbose messages.',
     'debug;d;;'   => "With debug message.",
     'help;b;;'    => "Show this message.",
@@ -65,22 +66,18 @@ debug_option($opt_debug) if $opt_debug;
 # parse argument
 my @targets = @ARGV;
 my $i;
+my $aliasesfile = &expand_path($opt_file || &aliases_file);
 
-$opt_aliasesfile = &expand_path($opt_aliasesfile);
-if (! -f $opt_aliasesfile) {
-    im_warn("no alias file $opt_aliasesfile\n");
-    exit $EXIT_SUCCESS;
-}
-&open_aliases($opt_aliasesfile);
+&alias_open($aliasesfile);
 if (scalar(@targets) == 0) {
     local $, = "\n";
-    print &list_mail_aliases, "\n";
+    print alias_list_mail(), "\n";
 } else {
     foreach $i (@targets) {
-	print &alias_lookup($i), "\n";
+	print alias_lookup($i), "\n";
     }
 }
-&close_aliases();
+alias_close();
 
 exit $EXIT_SUCCESS;
 
@@ -92,7 +89,7 @@ imali - Display mail aliases
 
 =head1 SYNOPSIS
 
-B<imali> [B<--aliasesfile=file>] [B<--help>] [targets ...]
+B<imali> [B<--file=file>] [B<--help>] [targets ...]
 
 =head1 DESCRIPTION
 
@@ -105,7 +102,7 @@ are displayed.
 
 =over 5
 
-=item I<-a, --aliasfile = file>
+=item I<-f, --file = file>
 
 Use I<file> as a aliasfile. Default is ~/.im/Aliases.
 

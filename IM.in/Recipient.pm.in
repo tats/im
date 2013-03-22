@@ -20,10 +20,11 @@ package IM::Recipient;
 require 5.003;
 require Exporter;
 
-use IM::Config;
-use IM::Address;
-use IM::Alias;
-use IM::Iso2022jp;
+use IM::Util;
+use IM::Address qw(extract_addr fetch_addr);
+use IM::Alias qw(alias_lookup alias_host_completion);
+use IM::Config qw(expand_path);
+
 # use FileHandle;
 use integer;
 use strict;
@@ -75,7 +76,7 @@ sub add_to_rcpt ($$) {
 	} elsif (!$main::Obey_MTA_domain && $main::Default_to_domain_name) {
 	    $addr .= "\@$main::Default_to_domain_name";
 	}
-    } elsif ($a = &host_completion($addr)) {
+    } elsif ($a = alias_host_completion($addr)) {
 	$addr = $a;
     }
     # duplicate surpression
@@ -111,9 +112,15 @@ sub parse_rcpt ($$$) {
 
 ## if ISO2022JP
     if ($conv) {
-	$addr_list = &conv_iso2022jp($addr_list)
-	  if ($main::Iso2022jp_code_conversion);
+	if ($main::Iso2022jp_code_conversion) {
+	    require IM::Japanese;
+	    import IM::Japanese qw(conv_iso2022jp);
+	    $addr_list = conv_iso2022jp($addr_list);
+	}
 	if ($main::Iso2022jp_header_mime_conv) {
+	    require IM::Iso2022jp;
+	    import IM::Iso2022jp qw(struct_iso2022jp_mimefy);
+
 	    my $a = &struct_iso2022jp_mimefy($addr_list);
 	    return -1 if ($a eq '');
 	    $addr_list = $a;

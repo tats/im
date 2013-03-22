@@ -20,6 +20,7 @@ $Prog = 'imstore';
 
 use IM::Config;
 use IM::MsgStore;
+use IM::Util;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
@@ -37,7 +38,7 @@ Usage :: $Prog [options]
 ";
 
 @OptConfig = (
-    'dst;s;+inbox;' => 'Destination folder',
+    'dst;s;+inbox;' => 'Set destination folder',
     'verbose;b;;'   => 'With verbose messages.',
     'debug;d;;'     => "With debug message.",
     'help;b;;'      => 'Show this message'

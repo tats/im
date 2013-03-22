@@ -57,6 +57,7 @@ use IM::Nntp;
 use IM::Recipient;
 use IM::Smtp;
 use IM::TcpTransaction;
+use IM::Util;
 use integer;
 use strict 'refs';
 use strict 'subs';
@@ -197,8 +198,6 @@ Usage: $Prog [options] msg
 	=> 'Process queued messages.',
     'QueueStatus;b;;QueueStatus'
 	=> 'Show list of queued messages.',
-    'QueueDir;s;queue;Queue_Dir'
-	=> 'Path of directory for queuing.',
     'Folder;s;;Draft_folder'
 	=> 'Path of draft folder directory.',
     'MIMEbcc;b;1;Mime_bcc'
@@ -314,19 +313,25 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 
     if ($ProcessQueue || $QueueStatus) {
 	&init_final;
-	&process_queue($Queue_Dir, $ProcessQueue);
+	&process_queue(queue_path(), $ProcessQueue);
 	exit $EXIT_SUCCESS;
     }
 
-    &open_aliases($Mail_aliases, $Host_aliases);
+    alias_open($Mail_aliases, $Host_aliases);
 
+    if ($Draft_message eq '' && $#arg_rest == 0 && $arg_rest[0] !~ /\@/ &&
+        ($arg_rest[0] =~ /^\// || $arg_rest[0] =~ /^\w:\//)) {
+	# absolute path expression: a draft message
+	$Draft_message = $arg_rest[0];
+    }
     $Obey_header = 1 if ($Draft_message);
     if (!$Obey_header && !$Smtp_input_mode) {
 	foreach $arg (@arg_rest) {
 	    if ($arg !~ /\@/ && ($arg =~ /^\// || $arg =~ /^\w:\//)) {
-		# absolute path expression: a draft message
-		$Draft_message = $arg;	# XXX
+		# bad address list
+		$error = 1;
 		last;
+#		&error_exit;
 	    } else {
 		# otherwise: a mail address (not a news group)
 		if (&parse_rcpt(0, $arg) < 0) {
@@ -379,14 +384,14 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
     $SIG{'INT'} = \&int_func;
 
 ##### OPTIONAL CONFIGURATION #####
-    if ($Obey_header && ($selector = &header_value(\@Header, 'Config'))) {
+    if ($Obey_header && ($selector = &header_value(\@Header, 'Config')) ne '') {
 	$selector =~ s/\s+//g;
 	if ($selector ne '') {
 	    $error = 1 if (set_selector($selector) < 0);
 	}
 	&kill_header(\@Header, 'Config', 0);
-	&close_aliases;
-	&open_aliases($Mail_aliases, $Host_aliases);
+	alias_close();
+	alias_open($Mail_aliases, $Host_aliases);
     }
 
     &init_final;
@@ -522,13 +527,13 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 #		if ($News_flag);
 	}
     }
-    if (!&header_value(\@Header, 'Subject')) {
+    if (&header_value(\@Header, 'Subject') eq '') {
 	&add_header(\@Header, 1, 'Subject', $Subject);
     }
 
 ##### BODY PROCESSING #####
     unless (&header_value(\@Header, 'Mime-Version')) {
-	$Body_code = &body_code(\@Body);
+	$Body_code = code_check_body(\@Body);
 	im_debug("Body code is $Body_code\n") if (&debug('code'));
 	$do_conv_8to7 = 0;
 	if ($Body_code eq '8BIT') {
@@ -544,7 +549,7 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 	    $Need_mime_version_header = 1;
 	    if ($Iso2022jp_code_conversion) {
 		$Has_iso2022jp_body = 1;
-		&body_convert_iso2022jp(\@Body);
+		convert_iso2022jp_body(\@Body, $Body_code);
 		if ($Has_Hankaku_kana) {
 		    $Body_code = '8BIT';
 		    $Has_8bit_body = 1;
@@ -612,7 +617,7 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 	    im_err("Bad message format (no Newsgroups:).\n");
 	    &error_exit;
 	}
-	unless (&header_value(\@Header, 'Subject')) {
+	if (&header_value(\@Header, 'Subject') eq '') {
 	    im_err("Bad message format (no Subject:).\n");
 	    &error_exit;
 	}
@@ -709,7 +714,7 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
     &add_multipart if (@Mulipart_messages);
 
 ##### SIZE OF MESSAGE BODY FIXED #####
-    if (!&header_value(\@Header, 'Lines')) {
+    if (&header_value(\@Header, 'Lines') eq '') {
 	if ($#Body >= 0) {
 	    &add_header(\@Header, 1, 'Lines', $#Body);
 	} else {
@@ -740,7 +745,7 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 
 ##### QUEUING IF NEEDED #####
     if ($JustQueuing) {
-	if (&queue_message($Queue_Dir, \@Header, \@Body) == 0) {
+	if (&queue_message(queue_path(), \@Header, \@Body) == 0) {
 	    if ($Draft_message) {
 		&trash_message;
 	    }
@@ -773,7 +778,7 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 	&exit_($EXIT_SUCCESS);
     } else {
 	if ($rcode > 0 && $Queuing) {
-	    if (&queue_message($Queue_Dir, \@Header, \@Body) == 0) {
+	    if (&queue_message(queue_path(), \@Header, \@Body) == 0) {
 		if ($Draft_message) {
 		    &trash_message;
 		}
@@ -819,7 +824,7 @@ sub initialize {
 	}
     }
 
-    $Login = login_name();
+    $Login = im_getlogin();
     $Home = $ENV{'HOME'} if ($ENV{'HOME'});
 
     srand(time+$$);
@@ -1228,7 +1233,7 @@ sub add_multipart {
 	im_debug("adding message: $mp_msg\n") if (&debug('multipart'));
 	push(@Body, "--$mp_boundary\n");
 	&read_mp_message($mp_msg, \@Part);
-	$part_code = &body_code(\@Part);
+	$part_code = code_check_body(\@Part);
 	im_debug("code = $part_code\n") if (&debug('multipart'));
 	# add internal header
 	if ($part_code eq 'ASCII') {
@@ -1238,7 +1243,7 @@ sub add_multipart {
 	    push(@Body, "Content-Type: Text/plain; charset=iso-2022-jp\n");
 	} elsif ($part_code eq 'SJIS' || $part_code eq 'EUC') {
 	    if ($Iso2022jp_code_conversion) {
-		&body_convert_iso2022jp(\@Part);
+		convert_iso2022jp_body(\@Part, $part_code);
 		if ($Has_Hankaku_kana) {
 			$part_code = '8BIT';
 		} else {
@@ -1430,6 +1435,13 @@ sub save_fcc {
 		return '';
 	    }
 	}
+	if (&unixp() && !&no_sync()) {
+	    if (fsync(fileno($FCC)) < 0) {
+		im_err("FCC write failed ($!).\n");
+		close($FCC);
+		return '';
+	    }
+	}
 	unless (close($FCC)) {
 	    im_err("FCC write failed ($!).\n");
 	    return '';
@@ -1438,9 +1450,9 @@ sub save_fcc {
 	    &log_action('dead-letter', &get_cur_server(), $d, 'sent');
 	} else {
 	    &log_action('fcc', &get_cur_server(), $msg, 'sent');
-	    unless ($Cur_mid ne '' && open_history(1) < 0) {
-		store_history($Cur_mid, $msg);
-		close_history();
+	    unless ($Cur_mid ne '' && history_open(1) < 0) {
+		history_store($Cur_mid, $msg);
+		history_close();
 	    }
 	}
 	return $msg;
@@ -1468,6 +1480,14 @@ sub save_fcc {
 		return '';
 	    }
 	}
+	if (&unixp() && !&no_sync()) {
+	    if (fsync(fileno($FCC)) < 0) {
+		im_err("FCC write failed ($!).\n");
+		close($FCC);
+		unlink($err_remove) if ($err_remove);
+		return '';
+	    }
+	}
 	unless (close($FCC)) {
 	    im_err("FCC write failed ($!).\n");
 	    unlink($err_remove) if ($err_remove);
@@ -1477,9 +1497,9 @@ sub save_fcc {
 	    &log_action('dead-letter', &get_cur_server(), $d, 'sent');
 	} else {
 	    &log_action('fcc', &get_cur_server(), $msg, 'sent');
-	    unless ($Cur_mid ne '' && open_history(1) < 0) {
-		store_history($Cur_mid, $msg);
-		close_history();
+	    unless ($Cur_mid ne '' && history_open(1) < 0) {
+		history_store($Cur_mid, $msg);
+		history_close();
 	    }
 	}
     }
@@ -1500,19 +1520,20 @@ sub trash_message {
 	$d = $Draft_message;
     }
     my $message_file = &expand_path($d);
-    $message_file =~ /^(.*\D)(\d+)$/;
-    my ($dir, $file) = ($1, $2);
-    if ($Trashmark) {
-	if (-f "$dir$Trashmark$file") {
-	    unlink ("$dir$Trashmark$file");
+    if ($message_file =~ /^(.*\D)(\d+)$/) {
+	my ($dir, $file) = ($1, $2);
+	if ($Trashmark) {
+	    if (-f "$dir$Trashmark$file") {
+		unlink ("$dir$Trashmark$file");
+	    }
+	    if (!rename ("$dir$file", "$dir$Trashmark$file")) {
+		im_err("Can not rename: $dir$file as $dir$Trashmark$file\n");
+		&error_exit;
+	    }
+	    im_notice("$dir$file was renamed to $dir$Trashmark$file");
+	} else {
+	    unlink ("$dir$file");
 	}
-	if (!rename ("$dir$file", "$dir$Trashmark$file")) {
-	    im_err("Can not rename: $message_file\n");
-	    &error_exit;
-	}
-	im_notice("$dir$file was renamed to $dir$Trashmark$file");
-    } else {
-	unlink ("$dir$file");
     }
 }
 
@@ -1549,9 +1570,9 @@ sub annotate {
     my ($label, $ref) = @_;
     local $_;
     im_notice("annotating messages ($ref).\n");
-    return if (open_history(0) < 0);
-    my $msg = lookup_history($ref, LookUpMsg);
-    close_history();
+    return if (history_open(0) < 0);
+    my $msg = history_lookup($ref, LookUpMsg);
+    history_close();
     return -1 if ($msg eq '');
     my $first = "$label: Date: " . &gen_date(1) . "\n";
     my $second = "$label: To: " . join(',', @Recipients) . "\n";
@@ -1559,7 +1580,8 @@ sub annotate {
     EACH: foreach (split(',', $msg)) {
 	im_notice("annotating $_.\n");
 	my $cur = &expand_path($_);
-	my $tmp = $cur . '.tmp';
+	my $tmp = &conf_dir . "/anno$$\_"
+			. substr($cur,rindex($cur,"/")+1,-1) . ".tmp";
 	# copy to temporary file
 	unless (open(ORIGINAL, "<$cur")) {
 	    im_notice("anno: open failed(1): $cur ($!).\n");
@@ -1570,6 +1592,8 @@ sub annotate {
 	    close(ORIGINAL);
 	    return -1;
 	}
+	binmode(TMP) if(win95p() || os2p());
+	binmode(ORIGINAL) if(win95p() || os2p());
 	print TMP $first . $second;
 	my $checked = 0;
 	while (<ORIGINAL>) {
@@ -1612,6 +1636,8 @@ sub annotate {
 	    unlink($tmp);
 	    return -1;
 	}
+	binmode(TMP) if(win95p() || os2p());
+	binmode(ORIGINAL) if(win95p() || os2p());
 	my $size = -s ORIGINAL;
 	seek(ORIGINAL, 0, 2);
 	unless (print ORIGINAL $first . $second) {
@@ -1635,6 +1661,8 @@ sub annotate {
 	    unlink($tmp);
 	    return -1;
 	}
+	binmode(TMP) if(win95p() || os2p());
+	binmode(ORIGINAL) if(win95p() || os2p());
 	while (<TMP>) {
 	    unless (print ORIGINAL $_) {
 		close(TMP);
@@ -1663,8 +1691,7 @@ sub annotate {
 #	reutrn value: none
 #
 sub process_queue {
-    my ($dir, $deliver) = @_;
-    my ($queue_dir) = &expand_path($dir);
+    my ($queue_dir, $deliver) = @_;
     my ($q, $found);
     unless ($deliver) {
 	require IM::EncDec && import IM::EncDec;
@@ -1738,7 +1765,7 @@ sub process_queue {
 	    if ($t = &header_value(\@Header, 'Date')) {
 		print "    Date: $t\n";
 	    }
-	    if ($t = &header_value(\@Header, 'Subject')) {
+	    if (($t = &header_value(\@Header, 'Subject')) ne '') {
 ## if ISO2022JP
 		$t =~ s/\?=\s*=\?/\?==?/;
 		$t = &mime_decode_string($t);
@@ -1778,8 +1805,7 @@ sub process_queue {
 #		 0: success
 #
 sub queue_message {
-    local ($dir, *Header, *Body) = @_;
-    my ($queue_dir) = &expand_path($dir);
+    local ($queue_dir, *Header, *Body) = @_;
     my ($q);
     local (*QUEUE);
     unless (-d $queue_dir) {
@@ -1980,7 +2006,7 @@ sub exit_ {
     local ($stat) = @_;
     &smtp_close;
     &nntp_close;
-    &close_aliases;
+    alias_close();
     exit $stat;
 }
 

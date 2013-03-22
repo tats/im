@@ -20,7 +20,8 @@ package IM::Log;
 require 5.003;
 require Exporter;
 
-use IM::Config;
+use IM::Config qw(expand_path used_selectors msg_mode);
+use IM::Util;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -104,7 +105,7 @@ sub log_action ($$$$;@) {
 	return;
     }
 
-    my $file = &expand_path($main::Log_file);
+    my $file = expand_path($main::Log_file);
     return unless ($file =~ /^(\S+)$/);
     $file = $1;	# to pass through taint check
     &msg_mode(1);
