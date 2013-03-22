@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Nov 03, 1997
-### Revised: Mar  8, 2005
+### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::Grep.pm version 20050308(IM148)";
+my $PM_VERSION = "IM::Grep.pm version 20070423(IM149)";
 
 package IM::Grep;
 require 5.003;

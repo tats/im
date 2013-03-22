@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Mar  8, 2005
+### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::LocalMbox.pm version 20050308(IM148)";
+my $PM_VERSION = "IM::LocalMbox.pm version 20070423(IM149)";
 
 package IM::LocalMbox;
 require 5.003;
@@ -548,7 +548,7 @@ sub local_empty($) {
     my $mbox = shift;
     unless (truncate($mbox, 0)) {
 	unless (im_open(\*MBOX, ">$mbox")) {
-	    im_warn("mailbox can not be zeroed.\n");
+	    im_warn("mailbox cannot be zeroed.\n");
 	    return;
 	}
 	close(MBOX);

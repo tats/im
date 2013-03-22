@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Mar  8, 2005
+### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::Pop.pm version 20050308(IM148)";
+my $PM_VERSION = "IM::Pop.pm version 20070423(IM149)";
 
 package IM::Pop;
 require 5.003;
@@ -98,7 +98,7 @@ sub pop_open($$$$) {
 	    return -1;
 	}
     } elsif ($auth eq 'APOP') {
-	if ($resp !~ /^\+.*(<.+>)/i) {
+	if ($resp !~ /^\+.*(<[=!-;?-~]+\@[=!-;?-~]+>)/) {
 	    im_err("APOP is not supported by the server.\n");
 	    return -1;
 	}

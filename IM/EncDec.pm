@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Mar  8, 2005
+### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::EncDec.pm version 20050308(IM148)";
+my $PM_VERSION = "IM::EncDec.pm version 20070423(IM149)";
 
 package IM::EncDec;
 require 5.003;
@@ -152,7 +152,8 @@ sub mime_decode($$$) {
 	$ret = euc_jp_to_ctext($ret);
     } elsif ($cs =~ /euc-kr/i) {
 	$ret = euc_kr_to_ctext($ret);
-    } elsif ($cs =~ /shift_jis/i) {
+    } elsif ($cs =~ /shift_jis/i ||
+	     $cs =~ /ms_kanji/i || $cs =~ /windows-31j/i) {
 	$ret = shift_jis_to_ctext($ret);
     } elsif ($cs =~ /big5/i || $cs =~ /cn-big5/i) {
 	$ret = big5_to_ctext($ret);

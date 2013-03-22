@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Mar  8, 2005
+### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::MsgStore.pm version 20050308(IM148)";
+my $PM_VERSION = "IM::MsgStore.pm version 20070423(IM149)";
 
 package IM::MsgStore;
 require 5.003;
@@ -183,7 +183,7 @@ sub store_message($$;$) {
 	}
 	return 0;
     } else {
-	im_err("message can not be saved to $dst.\n");
+	im_err("message cannot be saved to $dst.\n");
 	return -1;
     }
 }

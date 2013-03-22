@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Aug 31, 1995
-### Revised: Mar  8, 2005
+### Revised: Apr 23, 2007
 ###
 
 BEGIN {
@@ -14,8 +14,8 @@ BEGIN {
 };
 
 $Prog = 'imput';
-my $VERSION_DATE = "20050308";
-my $VERSION_NUMBER = "148";
+my $VERSION_DATE = "20070423";
+my $VERSION_NUMBER = "149";
 $VERSION = "${Prog} version ${VERSION_DATE}(IM${VERSION_NUMBER})";
 my $VERSION_INFORMATION = "${Prog} (IM ${VERSION_NUMBER}) ${VERSION_DATE}
 Copyright (C) 1999 IM developing team
@@ -1181,7 +1181,7 @@ sub read_message {
 	$message_file = &expand_path($d);
     }
     unless (im_open(\*READ, "<$message_file")) {
-	im_err("Can not open: $message_file\n");
+	im_err("Cannot open: $message_file\n");
 	&error_exit;
     }
     if (&read_header(\*READ, \@Header, 0) < 0) {
@@ -1207,7 +1207,7 @@ sub read_mp_message {
 	$message_file = &expand_path($file);
     }
     unless (im_open(\*MP_READ, "<$message_file")) {
-	im_err("Can not open: $message_file\n");
+	im_err("Cannot open: $message_file\n");
 	&error_exit;
     }
     @content = ();
@@ -1351,7 +1351,7 @@ sub pgp_process {
 
 	local($f) = fork;
 	if ($f < 0) {
-	    im_err("Can not fork to exec PGP program.\n");
+	    im_err("Cannot fork to exec PGP program.\n");
 	    &error_exit;
 	}
 	if ($f > 0) {
@@ -1562,7 +1562,7 @@ sub trash_message {
 		unlink("$dir$Trashmark$file");
 	    }
 	    if (!rename("$dir$file", "$dir$Trashmark$file")) {
-		im_err("Can not rename: $dir$file as $dir$Trashmark$file\n");
+		im_err("Cannot rename: $dir$file as $dir$Trashmark$file\n");
 		&error_exit;
 	    }
 	    im_notice("$dir$file was renamed to $dir$Trashmark$file\n");
@@ -1587,7 +1587,7 @@ sub append_dist_header {
     my($message_file) = &expand_path($d);
     local(*DIST);
     unless (im_open(\*DIST, "<$message_file")) {
-	im_err("Can not open: $message_file\n");
+	im_err("Cannot open: $message_file\n");
 	&error_exit;
     }
     if (&read_header(\*DIST, \@Header, 1) < 0) {

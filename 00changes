@@ -1,3 +1,12 @@
+149 (2007/04/23)
+
+* IM/Pop.pm (pop_open): Don't allow non-ASCII characters for APOP timestamp.
+  [CVE-2007-1558]
+* IM/Imap.pm (imap_get, imap_head, imap_from, imap_scan_folder): More
+  tolerant regexp to fetch imap message.
+* IM/EncDec.pm (mime_decode): Supporting MS_Kanji and Windows-31J.
+* dot.im/get.sbr.refile: Ignore case to match header.
+
 148 (2005/03/08)
 
 * IM/Imap.pm (imap_get): Fix regexp to fetch imap message.
@@ -109,7 +118,7 @@
 
 141+tats20021028 (2002/10/28) unofficial release
 
-* impwagent.in, immknmz.in: Local security fix.
+* impwagent.in, immknmz.in: Local security fix. [CAN-2002-1395]
 * imsetup.in, cnf.im/SiteConfig.in, dot.im/Config: Modify comments for
   `NamazuV2', `NamazuLockDir', and `PwAgentTmpDir'.
 * impwagent.in, IM/GetPass.pm: Use pwagent_tmp_path().
