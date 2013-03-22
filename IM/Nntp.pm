@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Dec  7, 2002
+### Revised: Dec 13, 2002
 ###
 
-my $PM_VERSION = "IM::Nntp.pm version 20021207(IM142)";
+my $PM_VERSION = "IM::Nntp.pm version 20021213(IM143)";
 
 package IM::Nntp;
 require 5.003;
@@ -97,7 +97,7 @@ sub nntp_close() {
 #	group: news group to be posted in
 #	part: part number to be sent in partial message mode
 #	total: total number of partial messages
-#       authuser: User name for NNTP authentication
+#	authuser: User name for NNTP authentication
 #	return value:
 #		 0: success
 #		 1: recoverable error (should be retried)

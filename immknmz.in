@@ -7,7 +7,7 @@
 ### Author:  Shuichi Kitaguchi <kit@Mew.org>
 ###	Internet Message Group <img@mew.org>
 ### Created: Sep 23, 1999
-### Revised: Dec  7, 2002
+### Revised: Dec 13, 2002
 ###
 
 BEGIN {
@@ -15,7 +15,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "immknmz version 20021207(IM142)";
+my $VERSION = "immknmz version 20021213(IM143)";
 
 $Prog = 'immknmz';
 

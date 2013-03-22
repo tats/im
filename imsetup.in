@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  9, 1997
-### Revised: Dec  7, 2002
+### Revised: Dec 13, 2002
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imsetup version 20021207(IM142)";
+my $VERSION = "imsetup version 20021213(IM143)";
 
 $Prog = 'imsetup';
 
@@ -429,7 +429,8 @@ keep=$keep
 #Imget.Src=local:\${HOME}/Maildir	# in case of qmail
 UseCL=$usecl			# Use value of Content-Length header
 NoSync=$nosync			# Do not need fsync(2) on writing file
-#FsyncNumber=118		# system call number of fsync
+#FsyncNumber=0			# if 0, system call number of fsync is guessed
+#SshPath=/usr/bin/ssh		# Path name of SSH program
 
 ---
         if ($src =~ /^pop/i) {

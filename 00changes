@@ -1,3 +1,21 @@
+143 (2002/12/13)
+
+* The number of the fsync system call is guessed on run time by default.
+  If `FsyncNumber' is set to non-0 in Config, it is preferred.
+* imsetup.in, cnf.im/SiteConfig.in, dot.im/Config: Modify comments for
+  `FsyncNumber'.
+* IM/MsgStore.pm (fsync): Use `preferred_fsync_no', guessed number, and
+  `fsync_no'.
+* IM/Config.pm.in (preferred_fsync_no, fsync_no): Divide from `fsync_no'.
+  `preferred_fsync_no' uses `$FsyncNumber'.
+* imsetup.in, cnf.im/SiteConfig.in, dot.im/Config: Modify comments for
+  `SshPath'.
+* IM/Config.pm.in: Don't export `$SSH_PATH'.
+* IM/Ssh.pm: Use `ssh_path()' instead of `$SSH_PATH'.
+* IM/Config.pm.in (@CfgConfig): Add `SshPath'.
+* IM/Config.pm.in (ssh_path): New subroutine.
+* 00diff: New file.
+
 142 (2002/12/07)
 
 * New maintainer, Tatsuya Kinoshita <tats@vega.ocn.ne.jp>.  I obtained
