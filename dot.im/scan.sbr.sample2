@@ -17,7 +17,7 @@ sub scan_sub {
     if ($pattern ne '') {
 	$eval_string = "\$href->{'subject:'} =~ $pattern;";
 	eval "$eval_string";
-	$herf->{'indent-subject:'} = $href->{'indent:'} . $href->{'subject:'};
+	$href->{'indent-subject:'} = $href->{'indent:'} . $href->{'subject:'};
     }
 }
 

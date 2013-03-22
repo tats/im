@@ -1,75 +1,117 @@
-.TH imget 1 "1997Ç¯8·î13Æü"
-
-.SH "Ì¾Á°"
-imget \- ¥á¥Ã¥»¡¼¥¸¤Î³ÊÇ¼¡£
-
-.SH "·Á¼°"
-.B imget
-[\-\-quiet] [\-\-verbose] [\-\-noscan]
-[\-\-form=format] [\-\-jissafe] [\-\-width=width]
-[\-\-lock=lockstyle] [\-\-keep=type] [\-\-protokeep=type]
-[\-\-src=source]  [\-\-dst=+folder]
-[\-\-mode=mode] [\-\-assoc=list] [\-\-help]
-
-.SH "µ¡Ç½ÀâÌÀ"
-»ØÄê¤·¤¿¥½¡¼¥¹¤«¤é¥á¥Ã¥»¡¼¥¸¤ò¼èÆÀ¤·¡¢
-»ØÄê¤·¤¿¥Õ¥©¥ë¥À¤Ë³ÊÇ¼¤¹¤ë¡£
-
-.SH "¥ª¥×¥·¥ç¥ó"
-.TP
-.I "\-q, \-\-quiet"
-Æ°ºîÃæ¤Î¥á¥Ã¥»¡¼¥¸¤òÉ½¼¨¤·¤Ê¤¤¡£
-
-.TP
-.I "\-v, \-\-verbose"
-
-.TP
-.I "\-n, \-\-noscan"
-¥á¥Ã¥»¡¼¥¸¤Î¼èÆÀ¤Î¤ß¤ò¹Ô¤¤¡¢scan ¤Î¥Õ¥©¡¼¥à¤Ï½ÐÎÏ¤·¤Ê¤¤¡£
-
-.TP
-.I "\-f, \-\-form"
-scan »þ¤Ë½ÐÎÏ¤¹¤ë¥Õ¥©¡¼¥Þ¥Ã¥È¤ò»ØÄê¤¹¤ë¡£
-
-.TP
-.I "\-j, \-\-jissafe"
-scan ¤Î½ÐÎÏ¤Ë¡¢JIS ¤¬´Þ¤Þ¤ì¤Æ¤¤¤Æ¤â°ÂÁ´¤Ê¥ë¡¼¥Á¥ó¤ò»ÈÍÑ¤¹¤ë¡£
-»ØÄê¤·¤Ê¤¤Êý¤¬¹âÂ®¤ËÆ°ºî¤¹¤ë¤¿¤á¡¢
-JIS ¤¬´Þ¤Þ¤ì¤ë¤³¤È¤¬¤Ê¤¤´Ä¶­¤Ç¤Ï¡¢»ØÄê¤·¤Ê¤¤Êý¤¬Ë¾¤Þ¤·¤¤¡£
-
-.TP
-.I "\-w, \-\-width"
-scan ¤Ç½ÐÎÏ¤¹¤ëÊ¸»úÉý¤ò»ØÄê¤¹¤ë¡£
-
-.TP
-.I "\-l, \-\-lock"
-¥í¡¼¥«¥ë¤Î mbox ¤«¤é¥Õ¥¡¥¤¥ë¤ò¼èÆÀ¤¹¤ë¤È¤­¤Ë¡¢lock ¤Î¥¿¥¤¥×¤ò»ØÄê¤¹¤ë¡£
-»ØÄê¤Ç¤­¤ë¤â¤Î¤Ë¤Ï none, flock, file ¤Î 3¤Ä¤¬¤¢¤ê¡¢
-¤½¤ì¤¾¤ì lock ¤ò¹Ô¤ï¤Ê¤¤¡¢flock() ¤ò»ÈÍÑ¤·¤¿¥í¥Ã¥¯¤ò¹Ô¤¦¡¢
-¥Õ¥¡¥¤¥ë¤ò»ÈÍÑ¤·¤¿¥í¥Ã¥¯¤ò¹Ô¤¦¤ò°ÕÌ£¤¹¤ë¡£
-¥Ç¥Õ¥©¥ë¥È¤Ï flock¡£
-
-.TP
-.I "\-k, \-\-keep"
-
-.TP
-.I "\-p, \-\-protokeep"
-
-.TP
-.I "\-s, \-\-src"
+			IMGET $B%^%K%e%"%k(B
 
 
-.TP
-.I "\-d, \-\-dst"
-¥á¥Ã¥»¡¼¥¸¤ò³ÊÇ¼¤¹¤ë¥Õ¥©¥ë¥À¤ò»ØÄê¤¹¤ë¡£
-¥Ç¥Õ¥©¥ë¥È¤Ï +inbox¡£
+$B%*%W%7%g%s(B:
 
-.TP
-.I "\-m, \-\-mode"
-
-.TP
-.I "\-a, \-\-assoc"
-
-.TP
-.I "\-h, \-\-help"
-¥Ø¥ë¥×¥á¥Ã¥»¡¼¥¸¤ÎÉ½¼¨¡£
+	--help=<sw>	on: $B%X%k%W%a%C%;!<%8$rI=<($9$k!#(B
+	--quiet=<sw>	on: get $B$7$?Am%a%C%;!<%8?t$J$I$N>pJs$rI=<($7$J$$!#(B
+	--verbose=<sw>	on: $B=hM}$K4X$9$k$5$^$6$^$J>pJs$rI=<($9$k!#(B
+	--debug=<sw>	on: $B%G%P%C%0%a%C%;!<%8$rI=<($9$k!#(B
+	--noscan=<sw>	on: get $B$N:]$K(B scan $BI=<($r9T$o$J$$!#(B
+	--form=<string> scan $BI=<(MQ$N%U%)!<%^%C%H$r5-=R$9$k!#(B
+	--jissafe=<sw>	on: scan $BI=<($N%U%)!<%^%C%H=hM}$N:]$K!"(BISO-2022-JP
+			    $BEy$N%(%9%1!<%W%7!<%1%s%9$r9MN8$9$k!#(B
+	--width=<num>	scan $BI=<($N:]$N0l9T$NI}$r;XDj$9$k!#(B
+	--lock=<string>	$B%m!<%+%k$N%a!<%k%\%C%/%9(B($B%U%!%$%k(B)$B$+$i(B get $B$9$k:]$K(B
+			$B9T$&GSB>@)8f(B($B%m%C%/(B)$B$NJ}<0$r;XDj$9$k!#(B
+			none:  $B%m%C%/$r9T$o$J$$!#(B
+			flock: flock() $B$K$h$k%m%C%/$r9T$&!#(B
+			file:  mailbox $B$H$$$&%U%!%$%k$r07$&:]$K!"$=$N%U%!%$%k(B
+			       $B$,CV$+$l$F$$$k%G%#%l%/%H%j$K(B mailbox.lock $B$H(B
+			       $B$$$&%m%C%/%U%!%$%k$r:n@.$9$k!#(B
+			flock $B$H(B file $B$rJ;MQ$9$k>l9g$O!"(Bflock+file $B$J$I$N(B
+			$B$h$&$K;XDj$9$k!#(B
+	--rpath=<string>UNIX From $B9T$r(B Return-Path: $B$KJQ2=$9$kJ}K!$r;XDj$9$k!#(B
+			ignore:  UNIX From $B9T$N>pJs$O<N$F$k(B
+			append:  UNIX From $B9T$N>pJs$r(B Return-Path: $B$H$7$F;D$9(B
+			replace: $B4{B8$N(B Return-Path: $B$r:o=|$7$F(B append
+	--keep=<num>	get $B$7$?8e$N%a!<%k$N07$$$K$D$$$F;XDj$9$k!#(B
+			-1: get $B$7$?8e$b:o=|$7$J$$!#(B
+			 0: get $B$N8e$?$@$A$K:o=|$9$k!#(B
+			 n: get $B$7$?8e!"(Bn $BF|7P2a$7$F$+$i:o=|$9$k(B(POP$B$N$_(B)$B!#(B
+			    n $B$O!"(Bget $B$7$?;~E@$+$i5/;;$9$k$b$N$G$"$j!"(B
+			    $B%a%C%;!<%8$NH/?.;~4V$H$O4X78$J$$!#(B
+			    $B$?$@$7!"(BPOP $B$r;HMQ$9$k>l9g$G$b!"(B--protokeep $B$N(B
+			    $B@_Dj$K$h$j5!G=$7$J$$>l9g$,$"$k!#(B
+	--protokeep=<string>
+			POP $B$K$*$$$F!"%a%C%;!<%8$r$9$0$K:o=|$;$:!"%5!<%P$K(B
+			$BJ]B8$7$F$*$/>l9g$K!"4{FI$N%a%C%;!<%8$HL$FI$N(B
+			$B%a%C%;!<%8$r<1JL$9$kJ}K!$r;XDj$9$k!#(B
+			UIDL: popd $B$,(B UIDL $B%3%^%s%I$r<uM}$7!"(Bpopd $BB&$G0l0U$J(B
+			      $B%a%C%;!<%8<1JL;R$rIUM?$9$k$3$H$,$G$-$k>l9g$K(B
+			      $B;XDj$9$k!#J#?t$N%/%i%$%"%s%H$+$iF1$8%a!<%k$r(B
+			      $B<h$j9~$_$?$$>l9g$KM-8z!#(B
+			LAST: popd $B$,J]B8$9$k:G6a%"%/%;%9$7$?%a%C%;!<%8$r(B
+			      LAST $B%3%^%s%I$GCN$j!"$=$N8e$KE~Ce$7$?%a%C%;!<(B
+			      $B%8$N$_$r(B get $B$9$k!#$3$l$r;XDj$7$?>l9g!"F|?t(B
+			      $B;XDj$K$h$k%a%C%;!<%8$N:o=|$O%5%]!<%H$5$l$J$$!#(B
+			      $B$^$?!"J#?t$N%/%i%$%"%s%H$+$i$OF1$8%a!<%k$r(B
+			      $B<h$j9~$`$3$H$O:$Fq$G$"$k!#(B
+			STATUS: $B%a%C%;!<%8$N%X%C%@$N(B Status: $B9T$K$h$C$F!"(B
+			      $BL$FI!&4{FI$NH=JL$r9T$&J}K!$rMxMQ$9$k!#F|?t;XDj(B
+			      $B$K$h$k%a%C%;!<%8$N:o=|$O!"(BMessage-Id: $B9T$N(B
+			      $B>pJs$K$h$C$F9T$&!#J#?t$N%/%i%$%"%s%H$+$i$OF1$8(B
+			      $B%a!<%k$r<h$j9~$`$3$H$O:$Fq$G$"$k!#(B
+			MSGID: $B%a%C%;!<%8$N%X%C%@$N(B Message-Id: $B9T$K$h$C$F!"(B
+			      $BL$FI!&4{FI$NH=JL$r9T$&J}K!$rMxMQ$9$k!#J#?t$N(B
+			      $B%/%i%$%"%s%H$+$iF1$8%a%C%;!<%8$r<h$j9~$`$3$H$b(B
+			      $B2DG=!#$?$@$7!"F10l%a%C%;!<%8(BID$B$N%a%C%;!<%8$,(B
+			      $BJ#?t%5!<%P$KB8:_$7$F$$$k>l9g$O!":G=i$K%"%/%;%9(B
+			      $B$7$?%a%C%;!<%8$N$_$7$+(B get $B$G$-$J$$$3$H$KCm0U!#(B
+	--count=<num>	$B%K%e!<%9$+$i0lEY$K<h$j9~$`%a%C%;!<%8$N?t$N>e8B$r;XDj(B
+			$B$9$k!#(B
+	--src=<string>	$B%a%C%;!<%8$r<h$j9~$`85$d%W%m%H%3%k$r;XDj$9$k!#(B
+			$B%W%m%H%3%k$H$7$F$O<!$N(B4$B$D$,%5%]!<%H$5$l$F$$$k!#(B
+			local	$B%m!<%+%k$N%U%!%$%k$+$i(B get $B$9$k!#(B
+				<string> $B$X$N;XDj$N7A<0$O!"(Blocal[:file]$B!#(B
+				[] $B$O!"$=$NCf$N5-=R$,>JN,$G$-$k$3$H$r<($9!#(B
+				$B>JN,$7$?>l9g$O!"(B/var/mail/${USER} $B$J$I$r(B
+				$B<+F0E*$K%5!<%A$9$k!#(B
+				file $B$H$7$F07$($k7A<0$O!"0J2<$N(B3$B$D!#(B
+				$B!&(BMH$B$N%U%)%k%@7A<0(B($B%G%#%l%/%H%j$NCf$K!"J#?t$N(B
+				  $B%a%C%;!<%8$,%U%!%$%kKh$KJ,N%$5$l!"O"HV$N(B
+				  $B%U%!%$%kL>$,$D$$$?$b$N(B)
+				  $B$3$N>l9g!"(Bfile $B$K$O%G%#%l%/%H%j$r;XDj$9$k!#(B
+				$B!&(BUNIX$B$N(Bmailbox$B7A<0%U%!%$%k(B
+				$B!&(BMMDF$B7A<0%U%!%$%k(B(^A^A^A^A $B$G;O$^$k(B)
+				$B$3$l$i$O<+F0H=JL$5$l$k!#(B
+			pop	POP $B$rMQ$$$F(B get $B$9$k!#(B
+				<string> $B$X$N;XDj$N7A<0$O!"(B
+					pop[/auth][:user][@host/[port]]
+				[] $B$O!"$=$NCf$N5-=R$,>JN,$G$-$k$3$H$r<($9!#(B
+				auth $B$K$O!"(BPOP, APOP, RPOP $B$N$&$A$N$$$:$l$+$r(B
+				$B;XDj$9$k!#%G%U%)%k%H$O(B APOP$B!#(B
+				RPOP $B$r;HMQ$9$k>l9g$O!"(Bimget $B$r(B SetUID root
+				$B$H$7$F%$%s%9%H!<%k$7$F$*$/I,MW$,$"$k!#(B
+				configure $B$G(B --enable-rpop $B$r;XDj$9$k$3$H!#(B
+			imap	IMAP $B$rMQ$$$F(B get $B$9$k!#(B
+				<string> $B$X$N;XDj$N7A<0$O!"(B
+					imap[/auth][:user][@host[/port]]
+				[] $B$O!"$=$NCf$N5-=R$,>JN,$G$-$k$3$H$r<($9!#(B
+				auth $B$K$O!"(BAUTH, LOGIN $B$N$&$A$N$$$:$l$+$r(B
+				$B;XDj$9$k!#%G%U%)%k%H$O(B AUTH$B!#(B
+			nntp	NNTP $B$rMQ$$$F(B get $B$9$k!#(B
+				<string> $B$X$N;XDj$N7A<0$O!"(B
+					nntp:group[@host]
+				[] $B$O!"$=$NCf$N5-=R$,>JN,$G$-$k$3$H$r<($9!#(B
+			$B$$$:$l$N>l9g$b!"(Buser $B$r>JN,$7$?>l9g$O!"%/%i%$%"%s%H(B
+			$B$G;HMQCf$N(B login $BL>!"(Bhost $B$r>JN,$7$?>l9g$O(B localhost
+			$B$,2>Dj$5$l$k!#$^$?!"(BConfig $B%U%!%$%k$K$F(B
+				PopAccount=/POP:user@server
+				ImapAccount=/LOGIN:user@server
+				NntpServers=server1
+			$B$N$h$&$K%G%U%)%k%H$r;XDj$7$F$*$/$3$H$b$G$-$k!#(B
+			$B$3$l$i$N(B POP, IMAP $B$K4X$9$k%G%U%)%k%H$O!"(B--src $B$K(B
+			pop $B$"$k$$$O(B imap $B$H$N$_5-=R$7$?>l9g$K;2>H$5$l!"(B
+			$B%*%W%7%g%s$r0l$D$G$bB3$1$F;XDj$7$?>l9g$OL5;k$5$l$k!#(B
+	--dst=<string>	get $B@h$N%U%)%k%@$r;XDj$9$k!#(B
+	--mode=<string>	imget $B$NF0:n$r;XDj$9$k!#(B
+			get:   $B?7Ce%a%C%;!<%8$r%U%)%k%@$K<h$j9~$`!#(B
+			from:  $B?7Ce%a%C%;!<%8$N(B From: $B9T$rI=<($9$k!#(B
+			check: $B?7Ce%a%C%;!<%8$NM-L5$r3NG'$9$k!#(B
+	--assoc=<string>$B0l2s$N5/F0$GJ#?t$N<h$j9~$_=hM}$r9T$$$?$$>l9g$K(B
+			$B;XDj$9$k!#6h@Z$j$K$O(B ; $B$rMQ$$$k!#Nc(B:
+			=mail=nntp:fj.mail.system.sendmail;=mail=nntp:fj.mail
+	--ignorepostpet=<sw> PostPet $B%/%i%$%"%s%H$,<u?.$9$Y$-%a!<%k$r(B get $B$;(B
+			$B$:!"%5!<%PB&$N%a!<%k%\%C%/%9$K;D$7$^$9!#(BPOP $B$rMxMQ$7(B
+			$B$F$$$k>l9g$K$N$_0UL#$r;}$A$^$9!#(B

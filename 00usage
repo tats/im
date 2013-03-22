@@ -47,12 +47,15 @@ The current program which chooses compatible options is only "imput".
 (Maybe "imget" in the future.)
 
 (4) The "+" keyword means "--src=+" or "--dst=+" while the "=" keyword
-means "--src==" or "--dst==" if folder(F) options is specified. 
-Examples are shown below:
+means "--src==" or "--dst==" if folder(F) options is
+specified. Examples are shown below:
+
 	+inbox             -> --src=+inbox
 	=comp.lang.perl    -> --src==comp.lang.perl
 
-To know that "+" / "=" is treated as "--src=" or "--dst=", see the
+Also "-", "/", "~", "%", and "[a-z]:" will be expanded in this manner.
+
+To know these keywords are treated as "--src=" or "--dst=", see the
 help message of each command.
 
 (5) Environment variables, config parameters and command line options
@@ -163,7 +166,7 @@ header-type as you want. Default valid 'header-type's are:
       %S    indented MIME decoded Subject (same as %i+%s)
       %b    a part of body extracted with heuristic
       %m    Multipart type
-		'S'igned, 'E'ncrypt, 'M'ultipart, or none
+		'S'igned, 'E'ncrypt, 'M'ultipart, 'P'artial or none
       %p    mark '*' if the message is destined to you
       %D    mark 'D' if the message is duplicated
       %M    %p+%D

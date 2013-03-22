@@ -219,6 +219,8 @@
 			off: To:, Cc:, Newsgroups: of header will not be
 			interpreted. It is necessary to specify the address
 			etc. in the command line. 
+  --AddHeader=<str,>	Any header to be added.
+			e.g.: --AddHeader='X-Header: value'
 
 [Options concerning delivery operation of message]
 

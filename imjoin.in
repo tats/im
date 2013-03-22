@@ -3,18 +3,17 @@
 ###
 ###				 imjoin
 ###
-###	      Copyright (C) 1997  Internet Message Group
-###
-###		     This Perl5 library conforms
-###		GNU GENERAL PUBLIC LICENSE Version 2.
-###
-###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  5, 1997
-### Revised: @im_revised@
+### Revised: Sep  5, 1998
 ###
 
-my $VERSION = "imjoin @im_version@";
+BEGIN {
+    @im_my_siteperl@
+    @im_src_siteperl@
+};
+
+my $VERSION = "imjoin version 980905(IM100)";
 
 $Prog = 'imjoin';
 
@@ -42,7 +41,7 @@ Usage: imjoin [options] msg
 ";
 
 @OptConfig = (
-	      'src;F;;'     => "Folder.",
+	      'src;f;;'     => "Folder.",
 	      'dst;s;+inbox;' => "Folder.",
 	      'verbose;b;;' => 'With verbose messages.',
 	      'debug;d;;'   => "With debug message.",
@@ -95,7 +94,13 @@ sub join_msg ($) {
 	require IM::Folder && import IM::Folder qw(message_name);
 	my $msg;
 	foreach $msg (@msgs) {
-	    push(@paths, message_name($opt_src, $msg));
+	    if ($msg =~ /^\//) {
+		push(@paths, $msg);
+	    } elsif ($msg =~ /(.*)\/(\d+)/) {
+		push(@paths, message_name($1, $2));
+	    } else {
+		push(@paths, message_name($opt_src, $msg));
+	    }
 	}
     }
 
@@ -113,7 +118,7 @@ sub join_msg ($) {
 	$header =~ s/\n\s+//g;
 	$header =~ s/[ \t]+//g;
 	$header =~ s/\n/;\n/g;
-	$header = "\n$header";
+	$header = "\n$header;\n";
 
 	my $number = 0;
 	my $this_total = 0;
@@ -265,6 +270,34 @@ sub get_paths ($) {
 
     return @paths;
 }
+
+### Copyright (C) 1997, 1998 IM developing team.
+### All rights reserved.
+### 
+### Redistribution and use in source and binary forms, with or without
+### modification, are permitted provided that the following conditions
+### are met:
+### 
+### 1. Redistributions of source code must retain the above copyright
+###    notice, this list of conditions and the following disclaimer.
+### 2. Redistributions in binary form must reproduce the above copyright
+###    notice, this list of conditions and the following disclaimer in the
+###    documentation and/or other materials provided with the distribution.
+### 3. Neither the name of the team nor the names of its contributors
+###    may be used to endorse or promote products derived from this software
+###    without specific prior written permission.
+### 
+### THIS SOFTWARE IS PROVIDED BY THE TEAM AND CONTRIBUTORS ``AS IS'' AND
+### ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+### IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+### PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE TEAM OR CONTRIBUTORS BE
+### LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+### CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+### SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+### BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+### WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+### OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+### IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### Local Variables:
 ### mode: perl

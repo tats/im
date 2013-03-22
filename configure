@@ -13,6 +13,8 @@ ac_default_prefix=/usr/local
 # Any additions from configure.in:
 ac_help="$ac_help
   --enable-rpop           Use RPOP (suidperl is needed)"
+ac_help="$ac_help
+  --with-perldir=DIR     Use DIR as site_perl directory"
 
 # Initialize some variables set by options.
 # The variables have the same names as the options, with
@@ -551,7 +553,7 @@ ac_configure=$ac_aux_dir/configure # This should be Cygnus configure.
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:555: checking for a BSD compatible install" >&5
+echo "configure:557: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -607,7 +609,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:611: checking host system type" >&5
+echo "configure:613: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -627,10 +629,73 @@ host_vendor=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\2/'`
 host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
+echo $ac_n "checking how to run the C preprocessor""... $ac_c" 1>&6
+echo "configure:634: checking how to run the C preprocessor" >&5
+# On Suns, sometimes $CPP names a directory.
+if test -n "$CPP" && test -d "$CPP"; then
+  CPP=
+fi
+if test -z "$CPP"; then
+if eval "test \"`echo '$''{'ac_cv_prog_CPP'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+    # This must be in double quotes, not single quotes, because CPP may get
+  # substituted into the Makefile and "${CC-cc}" will confuse make.
+  CPP="${CC-cc} -E"
+  # On the NeXT, cc -E runs the code through the compiler's parser,
+  # not just through cpp.
+  cat > conftest.$ac_ext <<EOF
+#line 649 "configure"
+#include "confdefs.h"
+#include <assert.h>
+Syntax Error
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:655: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out`
+if test -z "$ac_err"; then
+  :
+else
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  CPP="${CC-cc} -E -traditional-cpp"
+  cat > conftest.$ac_ext <<EOF
+#line 666 "configure"
+#include "confdefs.h"
+#include <assert.h>
+Syntax Error
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:672: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out`
+if test -z "$ac_err"; then
+  :
+else
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  CPP=/lib/cpp
+fi
+rm -f conftest*
+fi
+rm -f conftest*
+  ac_cv_prog_CPP="$CPP"
+fi
+  CPP="$ac_cv_prog_CPP"
+else
+  ac_cv_prog_CPP="$CPP"
+fi
+echo "$ac_t""$CPP" 1>&6
 
-im_version="version 980506"
-im_revised="May 06, 1998"
-im_file_attr="O_RDWR|O_CREAT|O_EXCL"
+
+im_file_attr="Fcntl::O_RDWR()|Fcntl::O_CREAT()|Fcntl::O_EXCL()"
+im_nosync="no"
+
+
+
 
 
 
@@ -642,7 +707,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:646: checking for $ac_word" >&5
+echo "configure:711: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'im_cv_path_im_path_perl'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -683,7 +748,7 @@ case "$im_path_perl" in
    exit 1
 esac
 echo $ac_n "checking for site_perl""... $ac_c" 1>&6
-echo "configure:687: checking for site_perl" >&5
+echo "configure:752: checking for site_perl" >&5
 if eval "test \"`echo '$''{'im_cv_path_im_path_siteperl'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -709,7 +774,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:713: checking for $ac_word" >&5
+echo "configure:778: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_im_path_chmod'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -741,49 +806,12 @@ test -n "$im_path_chmod" && break
 done
 test -n "$im_path_chmod" || im_path_chmod="missing_chmod"
 
-for ac_prog in cp
-do
-# Extract the first word of "$ac_prog", so it can be a program name with args.
-set dummy $ac_prog; ac_word=$2
-echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:750: checking for $ac_word" >&5
-if eval "test \"`echo '$''{'ac_cv_path_im_path_cp'+set}'`\" = set"; then
-  echo $ac_n "(cached) $ac_c" 1>&6
-else
-  case "$im_path_cp" in
-  /*)
-  ac_cv_path_im_path_cp="$im_path_cp" # Let the user override the test with a path.
-  ;;
-  *)
-  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS="${IFS}:"
-  for ac_dir in $PATH; do
-    test -z "$ac_dir" && ac_dir=.
-    if test -f $ac_dir/$ac_word; then
-      ac_cv_path_im_path_cp="$ac_dir/$ac_word"
-      break
-    fi
-  done
-  IFS="$ac_save_ifs"
-  ;;
-esac
-fi
-im_path_cp="$ac_cv_path_im_path_cp"
-if test -n "$im_path_cp"; then
-  echo "$ac_t""$im_path_cp" 1>&6
-else
-  echo "$ac_t""no" 1>&6
-fi
-
-test -n "$im_path_cp" && break
-done
-test -n "$im_path_cp" || im_path_cp="missing_cp"
-
 for ac_prog in mkdir
 do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:787: checking for $ac_word" >&5
+echo "configure:815: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_im_path_mkdir'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -820,7 +848,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:824: checking for $ac_word" >&5
+echo "configure:852: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_im_path_rm'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -852,8 +880,82 @@ test -n "$im_path_rm" && break
 done
 test -n "$im_path_rm" || im_path_rm="missing_rm"
 
+for ac_prog in mv
+do
+# Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+echo "configure:889: checking for $ac_word" >&5
+if eval "test \"`echo '$''{'ac_cv_path_im_path_mv'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  case "$im_path_mv" in
+  /*)
+  ac_cv_path_im_path_mv="$im_path_mv" # Let the user override the test with a path.
+  ;;
+  *)
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS="${IFS}:"
+  for ac_dir in $PATH; do
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      ac_cv_path_im_path_mv="$ac_dir/$ac_word"
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+  ;;
+esac
+fi
+im_path_mv="$ac_cv_path_im_path_mv"
+if test -n "$im_path_mv"; then
+  echo "$ac_t""$im_path_mv" 1>&6
+else
+  echo "$ac_t""no" 1>&6
+fi
+
+test -n "$im_path_mv" && break
+done
+test -n "$im_path_mv" || im_path_mv="missing_mv"
+
+for ac_prog in sed
+do
+# Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+echo "configure:926: checking for $ac_word" >&5
+if eval "test \"`echo '$''{'ac_cv_path_im_path_sed'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  case "$im_path_sed" in
+  /*)
+  ac_cv_path_im_path_sed="$im_path_sed" # Let the user override the test with a path.
+  ;;
+  *)
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS="${IFS}:"
+  for ac_dir in $PATH; do
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      ac_cv_path_im_path_sed="$ac_dir/$ac_word"
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+  ;;
+esac
+fi
+im_path_sed="$ac_cv_path_im_path_sed"
+if test -n "$im_path_sed"; then
+  echo "$ac_t""$im_path_sed" 1>&6
+else
+  echo "$ac_t""no" 1>&6
+fi
+
+test -n "$im_path_sed" && break
+done
+test -n "$im_path_sed" || im_path_sed="missing_sed"
+
 echo $ac_n "checking for DB type""... $ac_c" 1>&6
-echo "configure:857: checking for DB type" >&5
+echo "configure:959: checking for DB type" >&5
 if eval "test \"`echo '$''{'im_cv_perl_im_db_type'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -883,6 +985,91 @@ else
   im_rpop="-m 555"
 fi
 
+
+im_nosync="undefined"
+for im_check_headers in sys/syscall.h syscall.h
+do
+	ac_safe=`echo "$im_check_headers" | sed 'y%./+-%__p_%'`
+echo $ac_n "checking for $im_check_headers""... $ac_c" 1>&6
+echo "configure:995: checking for $im_check_headers" >&5
+if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  cat > conftest.$ac_ext <<EOF
+#line 1000 "configure"
+#include "confdefs.h"
+#include <$im_check_headers>
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:1005: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out`
+if test -z "$ac_err"; then
+  rm -rf conftest*
+  eval "ac_cv_header_$ac_safe=yes"
+else
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  eval "ac_cv_header_$ac_safe=no"
+fi
+rm -f conftest*
+fi
+if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
+  echo "$ac_t""yes" 1>&6
+  cat > conftest.$ac_ext <<EOF
+#line 1022 "configure"
+#include "confdefs.h"
+#include <$im_check_headers>
+			 #ifdef SYS_fsync
+			 sys_fsync_is_found
+			 #endif
+EOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  egrep "sys_fsync_is_found" >/dev/null 2>&1; then
+  rm -rf conftest*
+  im_nosync="no"
+else
+  rm -rf conftest*
+  im_nosync="yes"
+fi
+rm -f conftest*
+
+else
+  echo "$ac_t""no" 1>&6
+fi
+
+done
+
+im_src_siteperl="use lib '`pwd`';	###DELETE-ON-INSTALL###"
+# Check whether --with-perldir or --without-perldir was given.
+if test "${with_perldir+set}" = set; then
+  withval="$with_perldir"
+  im_path_siteperl="${withval}"
+  im_my_siteperl="use lib '${withval}';"
+else
+  if test "${prefix}" != "NONE" ; then
+    im_my_siteperl="use lib '${prefix}/lib';"
+    im_path_siteperl='${exec_prefix}/lib'
+  fi
+fi
+
+
+echo $ac_n "checking OS type""... $ac_c" 1>&6
+echo "configure:1060: checking OS type" >&5
+case "$host" in
+  *-*-solaris2*)
+    echo "$ac_t""Seems to be a Solaris; Content-Length: should be checked" 1>&6
+    im_usecl=yes ;;
+  *)
+    echo "$ac_t""Not a Solaris; Content-Length: can be ignored" 1>&6
+    im_usecl=no ;;
+esac
+
+echo $ac_n "checking domain for mail-address""... $ac_c" 1>&6
+echo "configure:1071: checking domain for mail-address" >&5
+im_hostname=`hostname`
+echo "$ac_t""$im_hostname" 1>&6
 
 trap '' 1 2 15
 cat > confcache <<\EOF
@@ -1005,32 +1192,8 @@ trap 'rm -fr `echo "imali:imali.in imcat:imcat.in imcd:imcd.in imclean:imclean.i
 	imrm:imrm.in imsetup:imsetup.in imsort:imsort.in \
 	imstore:imstore.in imtar:imtar.in\
 	Makefile:Makefile.in \
-	IM/Address.pm:IM.in/Address.pm.in \
-	IM/Alias.pm:IM.in/Alias.pm.in \
-	IM/Config.pm:IM.in/Config.pm.in \
-	IM/EncDec.pm:IM.in/EncDec.pm.in \
-	IM/File.pm:IM.in/File.pm.in \
-	IM/Folder.pm:IM.in/Folder.pm.in \
-	IM/GetPass.pm:IM.in/GetPass.pm.in \
-	IM/Grep.pm:IM.in/Grep.pm.in \
-	IM/Header.pm:IM.in/Header.pm.in \
-	IM/History.pm:IM.in/History.pm.in \
-	IM/Http.pm:IM.in/Http.pm.in \
-	IM/Imap.pm:IM.in/Imap.pm.in \
-	IM/Iso2022jp.pm:IM.in/Iso2022jp.pm.in \
-	IM/Japanese.pm:IM.in/Japanese.pm.in \
-	IM/LocalMbox.pm:IM.in/LocalMbox.pm.in \
-	IM/Log.pm:IM.in/Log.pm.in \
-	IM/MD5.pm:IM.in/MD5.pm.in \
-	IM/Message.pm:IM.in/Message.pm.in \
-	IM/MsgStore.pm:IM.in/MsgStore.pm.in \
-	IM/Nntp.pm:IM.in/Nntp.pm.in \
-	IM/Pop.pm:IM.in/Pop.pm.in \
-	IM/Recipient.pm:IM.in/Recipient.pm.in \
-	IM/Scan.pm:IM.in/Scan.pm.in \
-	IM/Smtp.pm:IM.in/Smtp.pm.in \
-	IM/TcpTransaction.pm:IM.in/TcpTransaction.pm.in \
-	IM/Util.pm:IM.in/Util.pm.in \
+	cnf.im/SiteConfig:cnf.im/SiteConfig.in \
+	IM/Config.pm:IM/Config.pm.in \
 	" | sed "s/:[^ ]*//g"` conftest*; exit 1' 1 2 15
 EOF
 cat >> $CONFIG_STATUS <<EOF
@@ -1068,17 +1231,22 @@ s%@host_alias@%$host_alias%g
 s%@host_cpu@%$host_cpu%g
 s%@host_vendor@%$host_vendor%g
 s%@host_os@%$host_os%g
-s%@im_version@%$im_version%g
-s%@im_revised@%$im_revised%g
+s%@CPP@%$CPP%g
 s%@im_rpop@%$im_rpop%g
 s%@im_db_type@%$im_db_type%g
 s%@im_file_attr@%$im_file_attr%g
+s%@im_src_siteperl@%$im_src_siteperl%g
+s%@im_my_siteperl@%$im_my_siteperl%g
+s%@im_usecl@%$im_usecl%g
+s%@im_nosync@%$im_nosync%g
+s%@im_hostname@%$im_hostname%g
 s%@im_path_perl@%$im_path_perl%g
 s%@im_path_siteperl@%$im_path_siteperl%g
 s%@im_path_chmod@%$im_path_chmod%g
-s%@im_path_cp@%$im_path_cp%g
 s%@im_path_mkdir@%$im_path_mkdir%g
 s%@im_path_rm@%$im_path_rm%g
+s%@im_path_mv@%$im_path_mv%g
+s%@im_path_sed@%$im_path_sed%g
 
 CEOF
 EOF
@@ -1128,32 +1296,8 @@ CONFIG_FILES=\${CONFIG_FILES-"imali:imali.in imcat:imcat.in imcd:imcd.in imclean
 	imrm:imrm.in imsetup:imsetup.in imsort:imsort.in \
 	imstore:imstore.in imtar:imtar.in\
 	Makefile:Makefile.in \
-	IM/Address.pm:IM.in/Address.pm.in \
-	IM/Alias.pm:IM.in/Alias.pm.in \
-	IM/Config.pm:IM.in/Config.pm.in \
-	IM/EncDec.pm:IM.in/EncDec.pm.in \
-	IM/File.pm:IM.in/File.pm.in \
-	IM/Folder.pm:IM.in/Folder.pm.in \
-	IM/GetPass.pm:IM.in/GetPass.pm.in \
-	IM/Grep.pm:IM.in/Grep.pm.in \
-	IM/Header.pm:IM.in/Header.pm.in \
-	IM/History.pm:IM.in/History.pm.in \
-	IM/Http.pm:IM.in/Http.pm.in \
-	IM/Imap.pm:IM.in/Imap.pm.in \
-	IM/Iso2022jp.pm:IM.in/Iso2022jp.pm.in \
-	IM/Japanese.pm:IM.in/Japanese.pm.in \
-	IM/LocalMbox.pm:IM.in/LocalMbox.pm.in \
-	IM/Log.pm:IM.in/Log.pm.in \
-	IM/MD5.pm:IM.in/MD5.pm.in \
-	IM/Message.pm:IM.in/Message.pm.in \
-	IM/MsgStore.pm:IM.in/MsgStore.pm.in \
-	IM/Nntp.pm:IM.in/Nntp.pm.in \
-	IM/Pop.pm:IM.in/Pop.pm.in \
-	IM/Recipient.pm:IM.in/Recipient.pm.in \
-	IM/Scan.pm:IM.in/Scan.pm.in \
-	IM/Smtp.pm:IM.in/Smtp.pm.in \
-	IM/TcpTransaction.pm:IM.in/TcpTransaction.pm.in \
-	IM/Util.pm:IM.in/Util.pm.in \
+	cnf.im/SiteConfig:cnf.im/SiteConfig.in \
+	IM/Config.pm:IM/Config.pm.in \
 	"}
 EOF
 cat >> $CONFIG_STATUS <<\EOF
@@ -1226,4 +1370,5 @@ EOF
 chmod +x $CONFIG_STATUS
 rm -fr confdefs* $ac_clean_files
 test "$no_create" = yes || ${CONFIG_SHELL-/bin/sh} $CONFIG_STATUS || exit 1
+
 

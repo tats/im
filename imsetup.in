@@ -3,18 +3,17 @@
 ###
 ###		    imsetup: setup command for IM
 ###
-###	      Copyright (C) 1997  Internet Message Group
-###
-###		     This Perl5 library conforms
-###		GNU GENERAL PUBLIC LICENSE Version 2.
-###
-###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  9, 1997
-### Revised: @im_revised@
+### Revised: Sep  5, 1998
 ###
 
-my $VERSION = "imsetup @im_version@";
+BEGIN {
+    @im_my_siteperl@
+    @im_src_siteperl@
+};
+
+my $VERSION = "imsetup version 980905(IM100)";
 
 $Prog = 'imsetup';
 
@@ -43,8 +42,8 @@ my $home = $ENV{'HOME'};
 my $address = im_getlogin() . "\@" . &get_domain_name();
 my $mail = "Mail";
 my $news = "News";
-my $usecl = "no";
-my $nosync = "no";
+my $usecl  = "@im_usecl@";
+my $nosync = "@im_nosync@";
 
 my ($mhdir, $mhalias, $domain, $nntpservers);
 
@@ -124,7 +123,8 @@ sub read_conf () {
 			    . " fsync(2)? (You can answer yes,\n"
 			    . "if your home directory is on local file system,"
 			    . " otherwise answer no.)"
-			    , $nosync);
+			    , $nosync eq 'undefined' ? 'no' : $nosync)
+			    if ($nosync ne 'yes');
 
     print "\n";
 }
@@ -159,6 +159,7 @@ sub scan_mh_conf () {
 	    chomp;
 	    if (/^Path:\s*/i) {
 		$mhdir = $mail =  $';
+		$mail =~ s/($home|~)\///;
 	    }
 	    if (/^Aliasfile:\s*/i) {
 		$mhalias = $';
@@ -271,6 +272,7 @@ ToDomain=$domain
 #Name=Full Name			# commentary name for my mail address
 #AddrRegex=
 #Org=The Mew Organization	# for news posting
+#User=user_name
 
 ##
 ## Default global parameters
@@ -339,8 +341,8 @@ NewsDir=$news			# for saved news
 #NntpHistory=newshist		# to save last state (relative to ~/.im/)
 #MBoxStyle=qmail		# if folder style mbox of qmail is used
 #Imget.Src=local:\${HOME}/MailDir# in case of qmail
-#UseCL=$usecl			# Use value of Content-Length header
-#NoSync=$nosync			# Do not need fsync(2) on writing file
+UseCL=$usecl			# Use value of Content-Length header
+NoSync=$nosync			# Do not need fsync(2) on writing file
 
 #PopAccount=/APOP\@localhost	# account info for POP access
 #PopAccount=user/APOP\@host	# account info with user name
@@ -370,7 +372,8 @@ NewsDir=$news			# for saved news
 #ObeyMTAdomain=yes		# do not append domainpart to addresses by imput
 #NoMsgIdForNews=yes		# do not insert Message-Id: when posting as news
 #NewsGMTdate=yes		# use GMT for Date: when posting as news
-#noJPheader			# do not encode ISO-2022-JP with RFC2047
+#UseLines=yes			# generate Lines header line
+#JPheader=yes			# encode ISO-2022-JP with RFC2047
 #Defcode=EUC			# default code in case no way to judge SJIS/EUCj
 #JPconv=yes			# convert SJIS/EUCj to ISO-2022-JP
 #NoHdrFolding=yes		# do not fold long header line when encoding
@@ -404,6 +407,34 @@ NewsDir=$news			# for saved news
 ---
     }
 }
+
+### Copyright (C) 1997, 1998 IM developing team.
+### All rights reserved.
+### 
+### Redistribution and use in source and binary forms, with or without
+### modification, are permitted provided that the following conditions
+### are met:
+### 
+### 1. Redistributions of source code must retain the above copyright
+###    notice, this list of conditions and the following disclaimer.
+### 2. Redistributions in binary form must reproduce the above copyright
+###    notice, this list of conditions and the following disclaimer in the
+###    documentation and/or other materials provided with the distribution.
+### 3. Neither the name of the team nor the names of its contributors
+###    may be used to endorse or promote products derived from this software
+###    without specific prior written permission.
+### 
+### THIS SOFTWARE IS PROVIDED BY THE TEAM AND CONTRIBUTORS ``AS IS'' AND
+### ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+### IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+### PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE TEAM OR CONTRIBUTORS BE
+### LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+### CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+### SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+### BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+### WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+### OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+### IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### Local Variables:
 ### mode: perl

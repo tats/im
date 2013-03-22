@@ -3,18 +3,17 @@
 ###
 ###				imput
 ###
-###	   Copyright (C) 1995-1997  Internet Message Group
-###
-###		     This Perl5 library conforms
-###		GNU GENERAL PUBLIC LICENSE Version 2.
-###
-###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Aug 31, 1995
-### Revised: @im_revised@
+### Revised: Sep  5, 1998
 ###
 
-$VERSION = "imput @im_version@";
+BEGIN {
+    @im_my_siteperl@
+    @im_src_siteperl@
+};
+
+my $VERSION = "imput version 980905(IM100)";
 
 $Prog = 'imput';
 
@@ -45,6 +44,7 @@ require 5.003;
 use IM::Address;
 use IM::Alias;
 use IM::Config;
+use IM::Folder qw(touch_folder);
 use IM::GetPass;
 use IM::Header;
 use IM::History;
@@ -63,7 +63,7 @@ use strict 'refs';
 use strict 'subs';
 use vars qw($DebugAll $QueueStatus $Subject $Ignore_Dot $Fcc_partial
 	    $News_severe_check $PreserveMessage $Queuing $Comment_Name
-	    $Help $JustQueuing $Me_too $PGP_Sign);
+	    $Help $JustQueuing $Me_too $Dcc_Address $PGP_Sign);
 
 $EXPLANATION = "
 $Prog :: Put Messages into Networks
@@ -140,6 +140,8 @@ Usage: $Prog [options] msg
     	=> 'Allow to show recipients in header as To: if no To: in original.',
     'MeToo;b;;Me_too'
     	=> 'Request DCC to me.',
+    'Dcc;s;;Dcc_Address'
+    	=> 'Supplemental DCC address.',
     'Fcc;s;;Fcc_folder'
 	=> 'Folder name to save FCC.',
     'Receipt;b;;Dsn_success_report'
@@ -178,10 +180,14 @@ Usage: $Prog [options] msg
 	=> 'Generate Message-Id header line.',
     'PidMsgId;b;;Message_id_PID'
 	=> 'Generate Message-Id with Process ID.',
+    'UidMsgId;b;;Message_id_UID'
+	=> 'Generate Message-Id with User ID instead of login name.',
     'Date;b;1;Generate_date'
     	=> 'Generate Date header line.',
     'NewsGMTdate;b;;NewsGMTdate'
 	=> 'Generate date field in GMT for posting news.',
+    'UseLines;b;1;UseLines'
+	=> 'Generate Lines header line.',
     'AliasesFile;s;;Mail_aliases'	# XXX
 	=> 'List of files for mail address aliasing.',
     'HostAliases;s;;Host_aliases'	# XXX
@@ -230,6 +236,8 @@ Usage: $Prog [options] msg
 	=> 'Enforce ESMTP (always begins with EHLO).',
     'NewsPost;b;1;News_flag'
 	=> 'Enable NNTP.',
+    'AddHeader;s@;;Add_headers'
+	=> 'Header lines to be added.',
 );
 
 @CmpConfig = (
@@ -317,7 +325,8 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 	exit $EXIT_SUCCESS;
     }
 
-    alias_open($Mail_aliases, $Host_aliases);
+    alias_read($Mail_aliases);
+    hosts_read($Host_aliases);
 
     if ($Draft_message eq '' && $#arg_rest == 0 && $arg_rest[0] !~ /\@/ &&
         ($arg_rest[0] =~ /^\// || $arg_rest[0] =~ /^\w:\//)) {
@@ -390,11 +399,18 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 	    $error = 1 if (set_selector($selector) < 0);
 	}
 	&kill_header(\@Header, 'Config', 0);
-	alias_close();
-	alias_open($Mail_aliases, $Host_aliases);
+	alias_read($Mail_aliases);
+	hosts_read($Host_aliases);
     }
 
     &init_final;
+
+    my ($h);
+    foreach $h (@Add_headers) {
+	if ($h =~ /^([\w\-]+):\s*/) {
+	    &add_header(\@Header, 0, $1, $');
+	}
+    }
 
 ##### HEADER PROCESSING #####
     if ($Obey_header && &header_value(\@Header, 'Return-Receipt-To')) {
@@ -635,6 +651,10 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
     if ($Me_too) {
 	&error_exit if (&add_to_rcpt(0, $Sender) < 0);
     }
+    my ($d);
+    foreach $d (split(',', $Dcc_Address)) {
+	&error_exit if (&add_to_rcpt(0, $d) < 0);
+    }
 
     # hook before final header processing
     &$Hook_PreFinalHeaderProc if ($Hook_PreFinalHeaderProc);
@@ -714,7 +734,7 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
     &add_multipart if (@Mulipart_messages);
 
 ##### SIZE OF MESSAGE BODY FIXED #####
-    if (&header_value(\@Header, 'Lines') eq '') {
+    if ($UseLines && &header_value(\@Header, 'Lines') eq '') {
 	if ($#Body >= 0) {
 	    &add_header(\@Header, 1, 'Lines', $#Body);
 	} else {
@@ -1454,6 +1474,7 @@ sub save_fcc {
 		history_store($Cur_mid, $msg);
 		history_close();
 	    }
+	    touch_folder($folder);
 	}
 	return $msg;
     }
@@ -1501,6 +1522,7 @@ sub save_fcc {
 		history_store($Cur_mid, $msg);
 		history_close();
 	    }
+	    touch_folder($folder);
 	}
     }
     return $msg;
@@ -1592,8 +1614,8 @@ sub annotate {
 	    close(ORIGINAL);
 	    return -1;
 	}
-	binmode(TMP) if(win95p() || os2p());
-	binmode(ORIGINAL) if(win95p() || os2p());
+	binmode(TMP);
+	binmode(ORIGINAL);
 	print TMP $first . $second;
 	my $checked = 0;
 	while (<ORIGINAL>) {
@@ -1636,8 +1658,8 @@ sub annotate {
 	    unlink($tmp);
 	    return -1;
 	}
-	binmode(TMP) if(win95p() || os2p());
-	binmode(ORIGINAL) if(win95p() || os2p());
+	binmode(TMP);
+	binmode(ORIGINAL);
 	my $size = -s ORIGINAL;
 	seek(ORIGINAL, 0, 2);
 	unless (print ORIGINAL $first . $second) {
@@ -1661,8 +1683,8 @@ sub annotate {
 	    unlink($tmp);
 	    return -1;
 	}
-	binmode(TMP) if(win95p() || os2p());
-	binmode(ORIGINAL) if(win95p() || os2p());
+	binmode(TMP);
+	binmode(ORIGINAL);
 	while (<TMP>) {
 	    unless (print ORIGINAL $_) {
 		close(TMP);
@@ -2006,7 +2028,6 @@ sub exit_ {
     local ($stat) = @_;
     &smtp_close;
     &nntp_close;
-    alias_close();
     exit $stat;
 }
 
@@ -2026,6 +2047,34 @@ sub exit_ {
 # draft all
 # @HOSTNAME@
 # sgid mail
+
+### Copyright (C) 1997, 1998 IM developing team.
+### All rights reserved.
+### 
+### Redistribution and use in source and binary forms, with or without
+### modification, are permitted provided that the following conditions
+### are met:
+### 
+### 1. Redistributions of source code must retain the above copyright
+###    notice, this list of conditions and the following disclaimer.
+### 2. Redistributions in binary form must reproduce the above copyright
+###    notice, this list of conditions and the following disclaimer in the
+###    documentation and/or other materials provided with the distribution.
+### 3. Neither the name of the team nor the names of its contributors
+###    may be used to endorse or promote products derived from this software
+###    without specific prior written permission.
+### 
+### THIS SOFTWARE IS PROVIDED BY THE TEAM AND CONTRIBUTORS ``AS IS'' AND
+### ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+### IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+### PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE TEAM OR CONTRIBUTORS BE
+### LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+### CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+### SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+### BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+### WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+### OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+### IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### Local Variables:
 ### mode: perl

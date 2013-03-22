@@ -1,39 +1,47 @@
-# This -*- perl -*- script writes the Makefile by ukai
-#
-# perl Makefile.pl
-# make
-# make install or make install_rpop
-#
+### This -*- perl -*- script writes the Makefile by ukai
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: Sep  5, 1998
+###
+### perl Makefile.PL
+### make
+### make install or make install_rpop
+###
+
 require 5.004;
-
-BEGIN {
-$VERSION = '91';
-$im_version="version 980506;
-$im_revised="May 06, 1998";
-$im_db_type="DB";
-
-# this should be in BEGIN section.
-if ($im_db_type) {
-    @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File SDBM_File ODBM_File);
-    unshift(@AnyDBM_File::ISA, "${im_db_type}_File");
-    print "try DB type: @AnyDBM_File::ISA\n";
-} else {
-    print "ignore DB type\n";
-}
-}
-
 use Config;
 
-$prefix = "/usr/local";
-$libdir = "\$exec_prefix/lib";
+BEGIN {
+    $VERSION = '100';
+    $im_db_type = "DB";
+
+    # this should be in BEGIN section.
+    if ($im_db_type) {
+	@AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File SDBM_File ODBM_File);
+	unshift(@AnyDBM_File::ISA, "${im_db_type}_File");
+	print "try DB type: @AnyDBM_File::ISA\n";
+    } else {
+	print "ignore DB type\n";
+    }
+}
 
 if (open(CONFIN, "configure.in")) {
     while (<CONFIN>) {
-	/^im_cv/ && eval "\$$_";
+	/^im_/ && eval "\$$_";
     }
     close(CONFIN);
 }
-# print "$im_version, $im_revised\n";
+
+$prefix = "/usr/local";
+$libdir = "\$exec_prefix/lib";
+chomp($im_hostname);
+if ($Config{osname} eq "solaris") {
+    $im_usecl='yes';
+} else {
+    $im_usecl='no';
+}
+$im_nosync='no';
 
 # checking DB type
 if ($im_db_type) {
@@ -42,6 +50,7 @@ if ($im_db_type) {
     $im_db_type =~ s/_File$//;
     print "Your DB type is $im_db_type\n";
 }
+
 # generate im*.in -> im*.PL
 opendir(DIR, ".") or die "cannot opendir .: $!";
 @programs_to_install = @pl_files = ();
@@ -63,8 +72,8 @@ print OUT << \"!GROK!THIS\";
 !GROK!THIS
 while (<DATA>) {
     /^#! \\\@im_path_perl\\\@/ && next;
-    s/\\\@im_version\\\@/$im_version/;
-    s/\\\@im_revised\\\@/$im_revised/;
+    s/\\\@im_my_siteperl\\\@//;
+    s/\\\@im_src_siteperl\\\@//;
     print OUT;
 }
 close(OUT);
@@ -79,22 +88,20 @@ __END__
 }
 closedir(DIR);
 
-
-# generate IM.in/*.pm.in -> IM/*.pm
-@modules_files = ();
-opendir(DIR, "IM.in") or die "cannot opendir IM.in: $!";
-foreach (grep(/\.in$/, readdir DIR)) {
-    open(IN, "IM.in/$_") or die "cannot open IM.in/$_: $!";
-    s/\.in$//;
-    open(PM, ">IM/$_") or die "cannot open IM/$_: $!";
-    push(@modules_files, "IM/$_");
-    print "Extracting IM/$_ (with variable substitutions)\n";
+# generate IM/Config.pm.in -> IM/Config.pm
+#          cnf.im/SiteConfig.in -> cnf.im/SiteConfig
+@generate_files = ('IM/Config.pm', 'cnf.im/SiteConfig');
+foreach (@generate_files) {
+    open(IN, "$_.in") or die "cannot open $_.in: $!";
+    open(PM, ">$_") or die "cannot open $_: $!";
+    print "Extracting $_ (with variable substitutions)\n";
     while (<IN>) {
-	s/\@im_version\@/$im_version/;
-	s/\@im_revised\@/$im_revised/;
-	s/\@im_db_type\@/$im_db_type/;
 	s/\@prefix\@/$prefix/;	# Config.pm.in
-	s/\@libdir\@/$libdir/;	# Config.pm.in
+	s/\@im_db_type\@/$im_db_type/;
+	s/\@im_file_attr\@/$im_file_attr/;
+	s/\@im_hostname\@/$im_hostname/;
+	s/\@im_usecl\@/$im_usecl/;
+	s/\@im_nosync\@/$im_nosync/;
 	print PM;
     }
     close(IN);
@@ -111,10 +118,9 @@ WriteMakefile(
     'MAN1PODS' => {},
     'MAN3PODS' => {},
     'clean' => { FILES => join(' ', '$(EXE_FILES)', 
-			       @pl_files, @modules_files) },
+			       @pl_files, @generate_files) },
     'dist' => { COMPRESS => 'gzip -9f', SUFFIX => 'gz' }
 ); 
-
 
 # special rules
 sub MY::postamble {
@@ -143,7 +149,6 @@ install_config: cnf.im/SiteConfig
 uninstall:: uninstall_config
 
 uninstall_config::
-	\$(RM_F) \$(IM_SITECONFIG_DIR)/Config
 	\$(RM_F) \$(IM_SITECONFIG_DIR)/SiteConfig
 
 install_rpop: install
@@ -152,4 +157,30 @@ install_rpop: install
     join "", @m;
 }
 
-
+### Copyright (C) 1997, 1998 IM developing team.
+### All rights reserved.
+### 
+### Redistribution and use in source and binary forms, with or without
+### modification, are permitted provided that the following conditions
+### are met:
+### 
+### 1. Redistributions of source code must retain the above copyright
+###    notice, this list of conditions and the following disclaimer.
+### 2. Redistributions in binary form must reproduce the above copyright
+###    notice, this list of conditions and the following disclaimer in the
+###    documentation and/or other materials provided with the distribution.
+### 3. Neither the name of the team nor the names of its contributors
+###    may be used to endorse or promote products derived from this software
+###    without specific prior written permission.
+### 
+### THIS SOFTWARE IS PROVIDED BY THE TEAM AND CONTRIBUTORS ``AS IS'' AND
+### ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+### IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+### PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE TEAM OR CONTRIBUTORS BE
+### LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+### CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+### SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+### BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+### WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+### OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+### IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

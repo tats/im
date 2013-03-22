@@ -1,3 +1,161 @@
+100 (98/09/05) mew-release release (for Mew 1.93 stable)
+
+* config.guess hack for NEC.
+	Maybe TABOO <y-koga@w3.mag.keio.ac.jp>
+* Makefile.PL fix.
+	Makoto MATSUSHITA <matusita@ics.es.osaka-u.ac.jp>
+* inet6 hack again.
+	Hajimu UMEMOTO <ume@calm.imasy.org>
+* OS/2 update again.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* typo fix for dot.im/scan.sbr.sample2.
+	Tsutomu Okada <okada@furuno.co.jp>
+* clean up configure options. prefix, bindir, libdir, and with-perldir.
+* Imget.dst fix.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* OS/2 update.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* inet6 hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* bindir hack for configure.in.
+	Makoto MATSUSHITA <matusita@ics.es.osaka-u.ac.jp>
+* Yet another patch of Makefile for run-in-place.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* GetPass patch.
+	Shuichi Kitaguchi <shuuic-k@is.aist-nara.ac.jp>
+* New Makefile.PL.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Use the install command in Makefile.
+* The IM.in directory was obsoleted.
+* usecl patch.
+	Makoto MATSUSHITA <matusita@ics.es.osaka-u.ac.jp>
+* New config.* from automake.
+* nosync hack.
+	nakaji@zeisei.dpri.kyoto-u.ac.jp
+* binmod for newshist.
+	Shuichi Kitaguchi <shuuic-k@is.aist-nara.ac.jp>
+* uname fix for configure.in.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Refine Grep.pm
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+* Newshist patch
+	Shuichi Kitaguchi <shuuic-k@is.aist-nara.ac.jp>
+* UseCL=yes for Solaris in SiteConfig.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Back to warning in TcpTransaction.pm.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Grep.pm fix
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+* Do not decode strings surrounded quote with RFC 2047.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* "use lib" will be deleted at installation.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* A tiny patch for Japanese.pm.
+	KIZU takashi <kizu@ics.es.osaka-u.ac.jp>
+
+99 (98/08/24) mew-release release
+
+* Copyright is changed from GPL2 into AS IS.
+* Perl 5.005 support.
+* The --enable-inet6 option!!
+	Hajimu UMEMOTO <ume@calm.imasy.org>
+* / -> --src=/ rule.
+	SHIMADA Nobutaka <shimada@mech.eng.osaka-u.ac.jp>
+* Ad hoc %D hack for message/partial.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* RMail support.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Dcc vs Config patch for imput.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* A patch fo alias.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+98 (98/08/22) mew-dist release
+
+* A patch for alias.
+	Murata Takashi <Takashi.Murata@nsgnet.co.jp>
+* Dcc: patch.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Home dir hack.
+* Multiple alias files for impath --path.
+
+97 (98/08/15) mew-dist release
+
+* impath --path displays AliasFile.
+* Lines for mail.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* New Alias.pm.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Ensuring two digits for Date:
+	Murata Takashi <Takashi.Murata@nsgnet.co.jp>
+
+96 (98/08/12) mew-dist release
+
+* Log patch.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Bug fix for imclean -v.
+	KOIE Hidetaka <koie@suri.co.jp>
+* One patch to Japanese.pm.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Eliminating jcode.pl.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+95 (98/07/27) mew-dist release
+
+* A patch to imjoin.
+	Shun-ichi GOTO <gotoh@taiyo.co.jp>
+* imsetup accepts an absolute path.
+	HATA Ryuji <hata@wildagain.scphys.kyoto-u.ac.jp>
+* Fix for unnecessary commas on address fields.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* touch_folder patch.
+	Shuichi Kitaguchi <shuuic-k@is.aist-nara.ac.jp>
+* binmode and \1 patch.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Make clean preserves the IM directory.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+94 (98/07/02) mew-dist release
+
+* exec_getsbrfile pachtes.
+	Taguchi Takeshi <taguchi@tohoku.iij.ad.jp>
+* GetPass.pm fixes.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Described user_name for convenience.
+	Shuichi Kitaguchi <shuuic-k@is.aist-nara.ac.jp>
+* imjoin now takes absolute file pathes to get along with Mew's Virtual
+  mode.
+
+93 (98/06/08) mew-dist release
+
+* IM can now be installed without the root privilege.
+	Yoshinari NOMURA <nom@csce.kyushu-u.ac.jp>
+* immv catched up Mew.
+	Yoshinari NOMURA <nom@csce.kyushu-u.ac.jp>
+* Executable even if the IM directory is installed in user's home.
+	Yoshinari NOMURA <nom@csce.kyushu-u.ac.jp>
+* From is inherited from the original message.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+
+92 (98/05/22) mew-dist release
+
+* Removed # for NoSync in imsetup.
+	KOIE Hidetaka <koie@suri.co.jp>
+* Removed # for UseCL in imsetup.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* NNTP error handing patch.
+	Gorochan ^o^ <kunito@hal.t.u-tokyo.ac.jp>
+* A patch for imput to add appropriate fields.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* tcp_rcv_siz patch.
+	"SAKANAKA, Tatsumi" <sakanaka@tokyo-gas.co.jp>
+* Touch fixes for imput.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Brushed up imtar.
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* 2022 ESC sequence patch.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
 91 (98/05/06) mew-dist release
 
 * RcvBufSiz is now customizable. 

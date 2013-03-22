@@ -1,0 +1,462 @@
+# -*-Perl-*-
+################################################################
+###
+###			      Folder.pm
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: Sep  5, 1998
+###
+
+my $PM_VERSION = "IM::Folder.pm version 980905(IM100)";
+
+package IM::Folder;
+require 5.003;
+require Exporter;
+
+use IM::Config qw(expand_path context_file inbox_folder folder_mode);
+use IM::Util;
+use integer;
+use strict;
+use vars qw(@ISA @EXPORT);
+
+@ISA = qw(Exporter);
+@EXPORT = qw(cur_folder set_cur_folder folder_info
+	message_number message_range message_name
+	get_message_paths create_folder touch_folder
+        chk_folder_existance chk_msg_existance get_impath);
+
+=head1 NAME
+
+Folder - IM folder handler
+
+=head1 DESCRIPTION
+
+
+=head1 SYNOPSIS
+
+use IM::Folder;
+
+$current_folder_name = &cur_folder();
+
+&set_cur_folder($new_current_folder_name);
+
+($number_of_files,
+ $number_of_message_files,
+ $minimum_message_number,
+ $maximum_message_number) = &folder_info($folder_name);
+
+$message_number = &message_number($message_number_or_name);
+
+@message_number_array = &message_range($message_range_string);
+
+$message_file_path = &message_name($folder_name, $message_number);
+
+=head1 DESCRIPTION
+
+&cur_folder();
+	results "+inbox"
+
+&set_cur_folder("+inbox");
+
+($a, $b, $c, $d) = &folder_info("+inbox");
+	results (10, 3, 1, 3)
+
+&message_number("+inbox", "cur");
+	results 3
+
+&message_range("+inbox", "1-3");
+	results (1, 2, 3)
+
+&message_name("+inbox", "3");
+	results "/usr/home/itojun/Mail/inbox/3"
+
+=cut
+
+#
+# Mail folder related routines.
+#
+
+sub cur_folder () {
+    my $folder;
+    local(*IN);
+
+    return inbox_folder() if (! -f context_file());
+
+    $folder = '';
+    open(IN, '< ' . context_file()) || im_die("can't open context file.\n");
+    while (<IN>) {
+	chomp;
+	if (/^CurrentFolder[:=]\s*(\S+)$/) {
+	    $folder = $1;
+	}
+    }
+    close(IN);
+    return $folder;
+}
+
+sub set_cur_folder ($) {
+    my($folder) = @_;
+    local(*IN, *OUT);
+    my($buf);
+
+    $buf = '';
+
+    if (-f context_file()) {
+	open(IN, '<' . context_file()) || im_die("can't open context file.\n");
+	while (<IN>) {
+	    chomp;
+	    next if (/^CurrentFolder[:=]\s*(\S+)$/);
+	    $buf .= $_ . "\n";
+	}
+	close(IN);
+    }
+
+    open(OUT, '>' . context_file()) || im_die("can't open context file.\n");
+    print OUT $buf;
+    print OUT "CurrentFolder=$folder\n";
+    close(OUT);
+}
+
+sub folder_info ($) {
+    my($folder) = @_;
+    local(*DIR);
+    my(@allfiles, $filecnt, $numfilecnt, $min, $max);
+
+    opendir(DIR, &expand_path($folder)) || im_die("can't open $folder.\n");
+    @allfiles = grep(!/^\./, readdir(DIR));
+    $filecnt = scalar(@allfiles);
+    @allfiles = grep(/^\d+$/, @allfiles);
+    $numfilecnt = scalar(@allfiles);
+    $min = (sort {$a <=> $b} @allfiles)[0];
+    $max = (sort {$b <=> $a} @allfiles)[0];
+    closedir(DIR);
+
+    return ($filecnt, $numfilecnt, $min, $max);
+}
+
+sub message_number ($$) {
+    my($folder, $number) = @_;
+    local(*IN, *DIR);
+    my($cur, $folder_dir, @filesinfolder, $offset, $max, $min);
+
+    # simple case: digits
+    if ($number !~ /\D/) {
+	return $number;
+    }
+
+    # get folder
+    $folder = &cur_folder if ($folder eq '');
+    $folder_dir = &expand_path($folder);
+    return '' if (!-d $folder_dir);
+
+    # get 'cur' message
+	$cur = '';
+#   if (-f "$folder_dir/.mh_sequences") {
+#	open(IN, "< $folder_dir/.mh_sequences") || return '';
+#	while (<IN>) {
+#	    s/\n$//;
+#	    if (/^cur:\s*(\d+)$/) {
+#		$cur = $1;
+#	    }
+#	}
+#	close(IN);
+#   }
+
+    # get list of messages
+    opendir(DIR, $folder_dir);
+    @filesinfolder = sort {$a <=> $b} grep(!/\D/, readdir(DIR));
+    closedir(DIR);
+
+    if (scalar(@filesinfolder) == 0) {
+	if ($number eq 'new') {
+	    $number = '1';
+	    while (-e "$folder_dir/$number" || -e "$folder_dir/.$number.dir") {
+		$number++;
+	    }
+	    return $number;
+	} else {
+	    return '';
+	}
+    }
+
+    $min = $filesinfolder[0];
+    $max = $filesinfolder[$#filesinfolder];
+
+    # items that need reverse ordered list
+    if ($number eq 'last') {
+	return $max;
+    }
+    if ($number eq 'first') {
+	return $min;
+    }
+    if ($number eq 'new') {
+	$number = $max + 1;
+	while (-e "$folder_dir/$number" || -e "$folder_dir/.$number.dir") {
+	    $number++;
+	}
+	return $number;
+    }
+    if ($number eq 'cur') {
+	return $cur;
+    }
+    if ($number eq 'next' || $number eq 'prev') {
+	$offset = ($number eq 'prev') ?  -1 : +1;
+
+	$number += $offset;
+	while ($min <= $number && $number <= $max) {
+	    return $number if (-f "$folder_dir/$number");
+	    $number += $offset;
+	}
+    }
+
+    return '';
+}
+
+sub message_range ($$) {
+    my($folder, $range) = @_;
+    my($folder_dir);
+    my(@filesinfolder);	# XXX local?
+    my($start, $end, $n, $dir);
+    local(*DIR);
+
+    $folder = &cur_folder if ($folder eq '');
+    $folder_dir = &expand_path($folder);
+
+    if ($range eq 'all') {
+	$range = 'first-last';
+    }
+
+    if ($range =~ /^(\d+|cur|first|last|next|prev|new)-(\d+|cur|first|last|next|prev|new)$/) {
+	($start, $end) = ($1, $2);
+	$start = &message_number($folder, $start);
+	$end = &message_number($folder, $end);
+	return () if ($start !~ /^\d+$/);
+	return () if ($end !~ /^\d+$/);
+	return () if ($start > $end);
+
+	opendir(DIR, $folder_dir) || im_die("can't open $folder_dir.\n");
+	@filesinfolder = grep(!/\D/ && $start <= $_ && $_ <= $end,
+	    readdir(DIR));
+	closedir(DIR);
+	return (&sort_uniq(\@filesinfolder));
+    }
+    if ($range =~ /^(\d+|cur|last|first|next|prev):([+-]?)(\d+)$/) {
+	($start, $n) = ($1, $3);
+	if ($start eq 'last') {
+	    $dir = ($2 eq '' || $2 eq '-') ? -1 : +1;
+	} else {
+	    $dir = ($2 eq '' || $2 eq '+') ? +1 : -1;
+	}
+	$start = &message_number($folder, $1);
+	return ($range) if ($start !~ /^\d+$/);
+
+	opendir(DIR, $folder_dir) || im_die("can't open $folder_dir.\n");
+	@filesinfolder = grep(!/\D/, readdir(DIR));
+	closedir(DIR);
+
+	if ($dir == 1) {
+	    @filesinfolder = grep($start <= $_, @filesinfolder);
+	    @filesinfolder = &sort_uniq(\@filesinfolder);
+	    splice(@filesinfolder, $n)
+		if $n < scalar(@filesinfolder);
+	} else {
+	    @filesinfolder = grep($_ <= $start, @filesinfolder);
+	    @filesinfolder = &sort_uniq(\@filesinfolder);
+	    @filesinfolder = sort {$a <=> $b} @filesinfolder;
+	    splice(@filesinfolder, 0, @filesinfolder - $n)
+		if $n < scalar(@filesinfolder);
+	}
+	return @filesinfolder;
+    }
+
+    return (&message_number($folder, $range));
+}
+
+sub message_name ($$) {
+    my($folder, $number) = @_;
+
+    $number = &message_number($folder, $number);
+    if ($number eq '') {
+	return '';
+    } else {
+	return &expand_path($folder) . '/' . $number;
+    }
+}
+
+sub get_message_paths ($@) {
+    my ($folder, @messages0) = @_; # local @messages0?
+    my ($i, @messages, @x); # local(@messages, @x);?
+
+    my $folder_dir = &expand_path($folder);
+
+    # no message specified:
+    # just print the path to the folder, and quit.
+    if (scalar(@messages0) == 0) {
+	return ($folder_dir);
+    }
+
+    # messages specified.
+    # print the path to the message.
+    if (!-d $folder_dir) {
+	$@ = "no such folder $folder";
+	return ();
+    }
+
+    @messages = @x = ();
+    foreach $i (@messages0) {
+	if ((@x = &message_range($folder, $i)) eq '') {
+	    $@ = "message $i out of range";
+	    return ();
+	}
+	push(@messages, @x);
+    }
+
+    # @messages = &sort_uniq(\@messages);
+
+    grep($_ = "$folder_dir/$_", @messages);
+}
+
+sub sort_uniq ($) {
+#    local(*target) = @_;
+#   my(%tmp);
+    my ($target) = shift;
+    my($i);
+
+#   undef %tmp;
+#   foreach $i (@target) {
+#	$tmp{$i} = 1;
+#   }
+#   return sort {$a <=> $b} keys %tmp;
+    my @r = sort {$a <=> $b} @{$target};
+    for ($i = 1; $i <= $#r;) {
+	if ($r[$i-1] == $r[$i]) {
+	    splice (@r, $i, 1);
+	    next;
+	}
+	$i++;
+    }
+    return @r;
+}
+
+
+sub create_folder ($) {
+    my $folder = shift;
+    my $path = &expand_path($folder);
+    return 0 if (-d $path);
+    my $p = '';
+    my $subdir;
+    foreach $subdir (split('/', $path)) {
+	if ($p eq '' && $subdir =~ /^\w:$/) {
+	    $p = $subdir;
+	    next;
+	}
+	$p .= "/$subdir";
+	unless (-d $p) {
+#	    im_debug("Creating directory: $p\n")
+#	      if (&debug('folder'));
+	    unless (mkdir($p, &folder_mode(0))) {
+		im_err("can't create directory $p ($!)\n");
+		return -1;
+	    }
+	}
+    }
+    return 0;
+}
+
+sub touch_folder ($) {
+    if (&win95p){
+	my ($dir) = shift;
+	$dir =~ s/\/\d+$//;
+	$dir = &expand_path($dir);
+	system "utime $dir";
+    } elsif (&os2p) {
+	my ($dir) = shift;
+	$dir =~ s/\/\d+$//;
+	$dir = &expand_path($dir);
+	my $now = time;	# XXX
+	utime ($now, $now, $dir);
+    }
+}
+
+##
+## Check folder existance.
+##
+sub chk_folder_existance (@) {
+    my @folders = @_;
+    my $path;
+
+    im_debug("chk_folder_existance: folder: @folders\n") if (&debug('all'));
+
+    foreach (@folders){
+	next if /^%/;		# skip IMAP folders
+	$path = get_impath($_);
+
+	if (-e $path) {
+	    im_die "folder $_ is not writable. (Nothing was refiled.)\n"
+		if (!-w $path);
+	} else {
+	    if (create_folder($path) == 0) {
+		im_warn "created folder $_.\n";
+	    } else {
+		im_die "cannot create folder $_. (Nothing was refiled.)\n";
+	    }
+	}
+    }
+    im_debug("chk_folder_existance: OK.\n") if (&debug('all'));
+}
+
+sub chk_msg_existance ($@) {
+    my $folder = shift;
+    my @paths  = get_impath($folder, @_);
+
+    im_debug("chk_msg_existance: folder: $folder msg: @_\n") if (&debug('all'));
+
+    foreach (@paths){
+	im_die "message specification error in $folder. (Nothing was refiled.)\n"
+	    if (!-f $_);
+    }
+    im_debug("chk_msg_existance: OK.\n") if (&debug('all'));;
+}
+
+sub get_impath ($@) {
+    my $folder = shift;
+    my @msgs  = @_;
+    my @paths;
+
+    im_debug("impath: folder: $folder msgs: @msgs\n") if (&debug('all'));;
+    @paths = get_message_paths($folder, @msgs);
+    im_debug("impath: paths: @paths\n") if (&debug('all'));;
+
+    return wantarray ? @paths : $paths[0];
+}
+
+1;
+
+### Copyright (C) 1997, 1998 IM developing team.
+### All rights reserved.
+### 
+### Redistribution and use in source and binary forms, with or without
+### modification, are permitted provided that the following conditions
+### are met:
+### 
+### 1. Redistributions of source code must retain the above copyright
+###    notice, this list of conditions and the following disclaimer.
+### 2. Redistributions in binary form must reproduce the above copyright
+###    notice, this list of conditions and the following disclaimer in the
+###    documentation and/or other materials provided with the distribution.
+### 3. Neither the name of the team nor the names of its contributors
+###    may be used to endorse or promote products derived from this software
+###    without specific prior written permission.
+### 
+### THIS SOFTWARE IS PROVIDED BY THE TEAM AND CONTRIBUTORS ``AS IS'' AND
+### ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+### IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+### PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE TEAM OR CONTRIBUTORS BE
+### LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+### CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+### SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+### BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+### WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+### OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+### IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

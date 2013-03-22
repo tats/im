@@ -2,38 +2,46 @@
 ###
 ###			       Makefile
 ###
-###	      Copyright (C) 1997  Internet Message Group
-###
-###		     This Perl5 library conforms
-###		GNU GENERAL PUBLIC LICENSE Version 2.
-###
-###
 ### Author:  Internet Message Group <img@mew.org>
-### Created: April 23, 1997
-### Revised: @im_revised@
+### Created: Apr 23, 1997
+### Revised: Sep  5, 1998
 ###
 
+SHELL=	/bin/sh
 srcdir=	@srcdir@
+
 INSTALL=@INSTALL@
-SHELL = /bin/sh
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
 
 chmod=	@im_path_chmod@
-cp=	@im_path_cp@
 mkdir=	@im_path_mkdir@
 rm=	@im_path_rm@
+mv=	@im_path_mv@
+sed=	@im_path_sed@
 
 prefix=	@prefix@
-bindir=	@bindir@
-libdir=	@libdir@/im
-mandir=	@mandir@
 exec_prefix=@exec_prefix@
-siteperl=@im_path_siteperl@
-imdir=$(siteperl)/IM
-RPOP=@im_rpop@
 
-PROG = imali imcat imcd imclean imgrep imhist imjoin imls immv \
+# --bindir
+bindir=@bindir@
+# --libdir
+libdir=@libdir@
+# --with-perldir
+perldir=@im_path_siteperl@
+
+# If you modify imlibdir, you should also modify IM/Config.
+imlibdir= $(libdir)/im
+moddir=	  $(perldir)/IM
+
+RPOP=	@im_rpop@
+
+PROG =	imali imcat imcd imclean imgrep imhist imjoin imls immv \
 	impack impath imput impwagent imrm imsetup imsort imstore \
 	imtar
+
+ALLPROG = $(PROG) imget
+
 all:
 	@echo everything has been done by configure.
 	@echo you only need to do "make install".
@@ -44,31 +52,62 @@ installbin::
 	[ -d $(bindir) ] || \
 		($(mkdir) -p $(bindir) && $(chmod) 755 $(bindir))
 	for f in $(PROG); do \
-		$(INSTALL) -m 555 $${f} $(bindir); done
-	$(INSTALL) $(RPOP) imget $(bindir)
+		$(sed) -e '/###DELETE-ON-INSTALL###/d' $${f} > $${f}.tmp ; \
+		$(INSTALL) -m 555 $${f}.tmp $(bindir)/$${f} ; \
+		$(rm) -f $${f}.tmp ; \
+	done
+	$(sed) -e '/###DELETE-ON-INSTALL###/d' imget > imget.tmp
+	$(INSTALL) $(RPOP) imget.tmp $(bindir)/imget
+	$(rm) -f imget.tmp
 
 installdata::
-	[ -d $(imdir) ] || \
-		($(mkdir) -p $(imdir) && $(chmod) 755 $(imdir))
-	$(cp) -r IM/* $(imdir)
-	$(chmod) -R 644 $(imdir)/*
-	$(chmod) 755 $(imdir)
-	[ -d $(libdir) ] || \
-		($(mkdir) -p $(libdir) && $(chmod) 755 $(libdir))
+	[ -d $(moddir) ] || $(mkdir) -p $(moddir)
+	$(chmod) 755 $(moddir)
+	for f in IM/*.pm; do \
+		$(INSTALL_DATA) $${f} $(moddir) ; \
+	done
+	[ -d $(imlibdir) ] || $(mkdir) -p $(imlibdir)
+	$(chmod) 755 $(imlibdir)
 	for cnf_im in SiteConfig ; do \
-		if test ! -f $(libdir)/$$cnf_im; then \
-			($(cp) $(srcdir)/cnf.im/$$cnf_im $(libdir)) ; \
+		if test ! -f $(imlibdir)/$$cnf_im; then \
+			$(INSTALL_DATA) $(srcdir)/cnf.im/$$cnf_im $(imlibdir); \
 		else \
-			($(cp) $(srcdir)/cnf.im/$$cnf_im $(libdir)/$$cnf_im.new) ; \
+			$(INSTALL_DATA) $(srcdir)/cnf.im/$$cnf_im $(imlibdir)/$$cnf_im.new; \
 		fi ;\
 	done
-	$(chmod) -R 644 $(libdir)/*
-	$(chmod) 755 $(libdir)
 
 clean::
-	$(rm) -f $(PROG) imget
-	$(rm) -rf IM
-	$(mkdir) IM
+	$(rm) -f $(ALLPROG)
+	$(rm) -f cnf.im/SiteConfig
+	$(rm) -f IM/Config.pm
 
 distclean:: clean
 	$(rm) -f Makefile config.log config.status config.cache
+
+### Copyright (C) 1997, 1998 IM developing team.
+### All rights reserved.
+### 
+### Redistribution and use in source and binary forms, with or without
+### modification, are permitted provided that the following conditions
+### are met:
+### 
+### 1. Redistributions of source code must retain the above copyright
+###    notice, this list of conditions and the following disclaimer.
+### 2. Redistributions in binary form must reproduce the above copyright
+###    notice, this list of conditions and the following disclaimer in the
+###    documentation and/or other materials provided with the distribution.
+### 3. Neither the name of the team nor the names of its contributors
+###    may be used to endorse or promote products derived from this software
+###    without specific prior written permission.
+### 
+### THIS SOFTWARE IS PROVIDED BY THE TEAM AND CONTRIBUTORS ``AS IS'' AND
+### ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+### IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+### PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE TEAM OR CONTRIBUTORS BE
+### LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+### CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+### SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+### BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+### WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+### OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+### IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

@@ -1,0 +1,19 @@
+--- configure.in.orig	Mon Aug 31 16:08:30 1998
++++ configure.in	Wed Sep  2 10:43:50 1998
+@@ -13,7 +13,7 @@
+ AC_CANONICAL_HOST
+ AC_PROG_CPP
+ 
+-im_file_attr="Fcntl::O_RDWR()|Fcntl::O_CREAT()|Fcntl::O_EXCL()"
++im_file_attr="Fcntl::O_RDWR()|Fcntl::O_CREAT()|Fcntl::O_EXCL()|Fcntl::O_BINARY()"
+ im_nosync="no"
+ 
+ AC_SUBST(im_rpop)
+@@ -124,6 +131,7 @@
+ 	Makefile:Makefile.in \
+ 	cnf.im/SiteConfig:cnf.im/SiteConfig.in \
+ 	IM/Config.pm:IM/Config.pm.in \
++	OS2/im.cmd:OS2/im.cmd.in \
+ 	, chmod 555 imali imcat imcd imclean imget imgrep imhist imjoin\
+ 	imls immv impack impath imput impwagent imrm imsetup imsort imstore\
+ 	imtar)

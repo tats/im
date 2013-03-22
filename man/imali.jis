@@ -1,23 +1,16 @@
-.TH imali 1 "1997«Ø8∑Ó13∆¸"
+			IMALI $B%^%K%e%"%k(B
 
-.SH "Ãæ¡∞"
-imali \- •·°º•Î°¶•®•§•Í•¢•π§Œ…Ωº®
 
-.SH "∑¡º∞"
-.B imali
-[\-\-aliasesfile=file] [\-\-help] [targets ...]
+$B5!G=(B:
 
-.SH "µ°«Ω¿‚Ã¿"
-targets §ÀªÿƒÍ§∑§ø•®•§•Í•¢•π§Œ∆‚Õ∆§Ú…Ωº®§π§Î°£
-§‚§∑ targets §Úæ Œ¨§∑§øæÏπÁ°¢
-•®•§•Í•¢•π°¶•’•°•§•Î§Àµ≠Ω“§µ§Ï§∆§§§Î§π§Ÿ§∆§Œ•®•§•Í•¢•π§Ú…Ωº®§π§Î°£
+	alias $B$NI=<((B
 
-.SH "•™•◊•∑•Á•Û"
-.TP
-.I "\-a, \-\-aliasfile" = file
-•®•§•Í•¢•π°¶•’•°•§•Î§»§∑§∆ª»Õ—§π§Î•’•°•§•Î§ÚªÿƒÍ§π§Î°£
-•«•’•©•Î•»§œ ~/.im/Aliases°£
+$B%*%W%7%g%s(B:
 
-.TP
-.I "\-h, \-\-help"
-•ÿ•Î•◊•·•√•ª°º•∏§Œ…Ωº®°£
+	--host=<sw>	on: mail $B$N(B alias $B$G$O$J$/$F(B host $B$N(B alias $B$r(B
+			$BI=<($9$k!#(B
+	--file=<string>	$B%G%U%)%k%H$N(B alias $B%U%!%$%k$NBe$o$j$K;HMQ$9$k(B
+			alias $B%U%!%$%k$r;XDj$9$k!#(B
+	--verbose=<sw>	on: $B=hM}$K4X$9$k$5$^$6$^$J>pJs$rI=<($9$k!#(B
+	--debug=<sw>	on: $B%G%P%C%0%a%C%;!<%8$rI=<($9$k!#(B
+	--help=<sw>	on: $B%X%k%W%a%C%;!<%8$rI=<($9$k!#(B

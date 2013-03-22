@@ -32,6 +32,7 @@ ToDomain=_domain_when_domain_part_is_omitted_
 #Name=Full Name			# commentary name for my mail address
 #AddrRegex=
 #Org=The Mew Organization	# for news posting
+#User=user_name
 
 ##
 ## Default global parameters
@@ -131,7 +132,8 @@ ToDomain=_domain_when_domain_part_is_omitted_
 #ObeyMTAdomain=yes		# do not append domainpart to addresses by imput
 #NoMsgIdForNews=yes		# do not insert Message-Id: when posting as news
 #NewsGMTdate=yes		# use GMT for Date: when posting as news
-#noJPheader			# do not encode ISO-2022-JP with RFC2047
+#UseLines=yes			# generate Lines header line
+#JPheader=yes			# encode ISO-2022-JP with RFC2047
 #Defcode=EUC			# default code in case no way to judge SJIS/EUCj
 #JPconv=yes			# convert SJIS/EUCj to ISO-2022-JP
 #NoHdrFolding=yes		# do not fold long header line when encoding
