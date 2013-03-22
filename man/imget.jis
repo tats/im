@@ -104,6 +104,8 @@
 				ImapAccount=/LOGIN:user@server
 				NntpServers=server1
 			のようにデフォルトを指定しておくこともできる。
+			これらにはさらに「%ローカルポート」を付加できる。
+			この場合 SSH ポート転送機能を利用する。
 			これらの POP, IMAP に関するデフォルトは、--src に
 			pop あるいは imap とのみ記述した場合に参照され、
 			オプションを一つでも続けて指定した場合は無視される。
@@ -113,9 +115,10 @@
 			get:   新着メッセージをフォルダに取り込む。
 			from:  新着メッセージの From: 行を表示する。
 			check: 新着メッセージの有無を確認する。
-	--assoc=<string>一回の起動で複数の取り込み処理を行いたい場合に
+	--assoc=<string> 一回の起動で複数の取り込み処理を行いたい場合に
 			指定する。区切りには ; を用いる。例:
 			=mail=nntp:fj.mail.system.sendmail;=mail=nntp:fj.mail
 	--ignorepostpet=<sw> PostPet クライアントが受信すべきメールを get せ
 			ず、サーバ側のメールボックスに残します。POP を利用し
 			ている場合にのみ意味を持ちます。
+	 --SSHServer=<string> 指定されたホストを SSH 中継サーバとして利用する。

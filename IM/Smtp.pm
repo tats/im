@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
-my $PM_VERSION = "IM::Smtp.pm version 990905(IM130)";
+my $PM_VERSION = "IM::Smtp.pm version 991025(IM133)";
 
 package IM::Smtp;
 require 5.003;
@@ -137,7 +137,7 @@ sub smtp_transaction ($$$$$$) {
     my $rc;
     do {
 	$rc = &smtp_transact_sub($servers, $Header, $Body, $bcc, $part,$total);
-	$rc = 1 if ($rc == -1 && $main::Smtp_fatal_next);
+	$rc = 1 if ($rc == -1 && $#$servers >= 0 && $main::Smtp_fatal_next);
 	my (@resp) = &command_response;
 	if ($rc > 0 && $#$servers >= 0) {
 	    # close and try the next server if TEMPFAIL

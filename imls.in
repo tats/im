@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Dec 31, 1995
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imls version 990905(IM130)";
+my $VERSION = "imls version 991025(IM133)";
 
 $Prog = 'imls';
 
@@ -74,6 +74,8 @@ Usage :: $Prog [options] [+folder] [range]
     'verbose;b;;' => 'With verbose messages.',
     'debug;d;;'   => "With debug message.",
     'help;b;;'    => 'Show this message',
+    'SSHServer;s;localhost;SSH_server'
+                       => 'SSH port relay server.',
     );
 
 ##

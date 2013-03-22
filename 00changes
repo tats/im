@@ -1,3 +1,40 @@
+133 (99/10/25) mew-dist release
+
+* The SSHServer option for several commands.
+	Motomichi Matsuzaki <mzaki@e-mail.ne.jp>
+* Supporting RPOP/IPv6.
+	Hajimu UMEMOTO <ume@mahoroba.org>
+* pureaddr: fix.
+* A patch for Nntp.pm.
+	Ninomiya Hideyuki <nin@shikoku.ne.jp>
+* Preventing creating unnecessary directories in immknmz.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+* A patch for immknmz.
+	Shuichi KITAGUCHI <kit@Mew.org>
+
+132 (99/10/07) mew-dist release
+
+* NNTP error check.
+	Motonori NAKAMURA <motonori@media.kyoto-u.ac.jp>
+* SSH patch
+	Hideyuki Suzuki <hideyuki@sat.t.u-tokyo.ac.jp>
+	Masatoshi Tsuchiya <tsuchiya@pine.kuee.kyoto-u.ac.jp>
+
+131 (99/10/07) mew-dist release
+
+* SMTP error handling.
+	Motonori NAKAMURA <motonori@media.kyoto-u.ac.jp>
+* Configure patch for OS/2.
+	OKUNISHI -GTO- Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>
+* immknmz.
+	Shuichi KITAGUCHI <kit@Mew.org>
+* SSH support.
+	Masatoshi Tsuchiya <tsuchiya@pine.kuee.kyoto-u.ac.jp>
+* Comment out PetnameFile.
+	Takashi.Murata@nsgnet.co.jp
+* A patch for IM/Imap.pm.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+
 130 (99/09/05) mew-release release
 
 * Only version change for stable release.

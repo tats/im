@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
-my $PM_VERSION = "IM::Nntp.pm version 990905(IM130)";
+my $PM_VERSION = "IM::Nntp.pm version 991025(IM133)";
 
 package IM::Nntp;
 require 5.003;
@@ -326,7 +326,13 @@ sub nntp_articles ($$$$) {
     for ($i = $art_start; $i <= $art_end; $i++) {
 	($rc, $article) = &nntp_article($i);
 	next if ($rc > 0);
-	return -1 if ($rc < 0);
+	if ($rc < 0) {
+	    return -1 if ($i == $art_start);
+	    im_warn("some articles left due to failure.\n");
+	    $last = $i-1;
+	    nntp_close();
+	    last;
+	}
 	$count++;
 
 	return -1 if (&store_message($article, $dst) < 0);
@@ -401,9 +407,8 @@ sub set_last_article_number ($$$) {
     my ($server, $group, $number) = @_;
     my ($pos, $last, $size) = (0, 0, 0);
 
-    if ($server =~ /([^\/]*)\/\d+$/) {
-       $server = $1;
-    }
+    $server =~ s!\%\d+$!!;
+    $server =~ s!/\d+$!!;
     my $nntphist = &nntphistoryfile() . '-' . $server;
     if ( -f $nntphist ) {
 	open (NEWSHIST, "+<$nntphist");
@@ -444,9 +449,8 @@ sub get_last_article_number ($$) {
     local $_;
     my $number = 0;
 
-    if ($server =~ /([^\/]*)\/\d+$/) {
-       $server = $1;
-    }
+    $server =~ s!\%\d+$!!;
+    $server =~ s!/\d+$!!;
     my $nntphist = &nntphistoryfile() . '-' . $server;
     if (open (NEWSHIST, "<$nntphist")) {
         binmode(NEWSHIST);

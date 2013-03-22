@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
-my $PM_VERSION = "IM::Config.pm version 990905(IM130)";
+my $PM_VERSION = "IM::Config.pm version 991025(IM133)";
 
 package IM::Config;
 require 5.003;
@@ -1008,7 +1008,7 @@ Imrm.dst=$TrashFolder		# default trash folder
 # mail address aliases for imali/imput
 AddrBookFile=Addrbook		# relative to ~/.im/
 AliasesFile=Aliases		# relative to ~/.im/
-PetnameFile=Petnames		# relative to ~/.im/
+#PetnameFile=Petnames		# relative to ~/.im/
 # imget/imls
 Form=%+5n %m%d %-14A %S || %b	# default format for scanning
 Width=80			# default width for scanning

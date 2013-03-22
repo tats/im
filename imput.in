@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Aug 31, 1995
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imput version 990905(IM130)";
+my $VERSION = "imput version 991025(IM133)";
 
 $Prog = 'imput';
 
@@ -102,15 +102,19 @@ Usage: $Prog [options] msg
     'Require;s;;User_require'
 	=> 'User defined perl script to be required.',
     'SMTPservers;s;localhost;Smtp_servers'
-	=> "List of SMTP servers (separated with ',').",
+	=> "List of SMTP servers (separated with ',')
+		Each element should be server[/remote_port][%local_port]",
     'EmgSMTPsvrs;s;;Emg_Smtp_servers'
 	=> 'List of SMTP servers for Emergency Use (i.e. error reporting).',
     'TryNextOnFatal;b;;Smtp_fatal_next'
 	=> 'Try next SMTP server evenif permanent failure.',
     'NNTPservers;s;localhost;Nntp_servers'
-	=> "List of NNTP servers (separated with ',').",
+	=> "List of NNTP servers (separated with ',').
+		Each element should be server[/remote_port][%local_port]",
     'ClientName;s;localhost;Client_name'
 	=> 'Name as a SMTP client (used for SMTP HELO).',
+    'SSHServer;s;localhost;SSH_server'
+	=> 'SSH port relay server.',
     'ObeyMTAdomain;b;;Obey_MTA_domain'
 	=> 'Do not qualify local addresses with default domain.',
     'FromDomain;s;;Default_from_domain_name'

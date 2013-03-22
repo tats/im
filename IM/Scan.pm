@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
-my $PM_VERSION = "IM::Scan.pm version 990905(IM130)";
+my $PM_VERSION = "IM::Scan.pm version 991025(IM133)";
 
 package IM::Scan;
 require 5.003;
@@ -510,7 +510,7 @@ sub parse_header ($) {
     if ($REF_SYMBOL{'pureaddr:'}) {
 	if (my_addr($href->{'from'})) {
 	    if ($href->{'to'}) {
-		my $to = &friendly_addr($href->{'to'}, 0);
+		my ($to, $rest) = &fetch_addr($href->{'to'}, 1);
 		if ($to) {
 		    $href->{'pureaddr:'} = 'To:' . $to;
 		}

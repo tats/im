@@ -1284,6 +1284,12 @@ rm -f conftest*
 fi
 if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
   echo "$ac_t""yes" 1>&6
+  :
+else
+  echo "$ac_t""no" 1>&6
+fi
+
+if test "$ac_cv_header_sys_syscall_h" = yes ; then
   cat > conftest.c << EOF
 #include <sys/syscall.h>
 #ifdef SYS_fsync
@@ -1293,18 +1299,16 @@ IM_FSYNC_NO=undef
 #endif
 EOF
 
-im_fsync_no=`eval $ac_cpp conftest.c | sed -n -e "s/^IM_FSYNC_NO=//p"`
+  im_fsync_no=`eval $ac_cpp conftest.c | sed -n -e "s/^IM_FSYNC_NO=//p"`
+  rm -f conftest.c
+else
+  im_fsync_no=undef
+fi
 if test "x$im_fsync_no" = "xundef"; then
   im_nosync="yes"
 else
   im_nosync="no"
 fi
-rm -f conftest.c
-
-else
-  echo "$ac_t""no" 1>&6
-fi
-
 
 im_src_siteperl="use lib '`pwd`';	###DELETE-ON-INSTALL###"
 # Check whether --with-perldir or --without-perldir was given.
@@ -1321,7 +1325,7 @@ fi
 
 
 echo $ac_n "checking OS type""... $ac_c" 1>&6
-echo "configure:1325: checking OS type" >&5
+echo "configure:1329: checking OS type" >&5
 case "$host" in
   *-*-solaris2*)
     echo "$ac_t""Seems to be a Solaris; Content-Length: should be checked" 1>&6
@@ -1332,7 +1336,7 @@ case "$host" in
 esac
 
 echo $ac_n "checking domain for mail-address""... $ac_c" 1>&6
-echo "configure:1336: checking domain for mail-address" >&5
+echo "configure:1340: checking domain for mail-address" >&5
 im_hostname=`hostname`
 echo "$ac_t""$im_hostname" 1>&6
 
@@ -1456,7 +1460,7 @@ trap 'rm -fr `echo "imali:imali.in imcat:imcat.in imcd:imcd.in imclean:imclean.i
 	impack:impack.in impath:impath.in imput:imput.in \
 	impwagent:impwagent.in \
 	imrm:imrm.in imsetup:imsetup.in imsort:imsort.in \
-	imstore:imstore.in imtar:imtar.in\
+	imstore:imstore.in imtar:imtar.in immknmz:immknmz.in\
 	Makefile:Makefile.in \
 	cnf.im/SiteConfig:cnf.im/SiteConfig.in \
 	IM/Config.pm:IM/Config.pm.in \
@@ -1566,7 +1570,7 @@ CONFIG_FILES=\${CONFIG_FILES-"imali:imali.in imcat:imcat.in imcd:imcd.in imclean
 	impack:impack.in impath:impath.in imput:imput.in \
 	impwagent:impwagent.in \
 	imrm:imrm.in imsetup:imsetup.in imsort:imsort.in \
-	imstore:imstore.in imtar:imtar.in\
+	imstore:imstore.in imtar:imtar.in immknmz:immknmz.in\
 	Makefile:Makefile.in \
 	cnf.im/SiteConfig:cnf.im/SiteConfig.in \
 	IM/Config.pm:IM/Config.pm.in \

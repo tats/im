@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
-my $PM_VERSION = "IM::Imap.pm version 990905(IM130)";
+my $PM_VERSION = "IM::Imap.pm version 991025(IM133)";
 
 package IM::Imap;
 require 5.003;
@@ -992,9 +992,9 @@ sub imap_refile ($$$) {
 }
 
 sub imap_delete_message () {
-    my ($src, $range) = @_;
+    my ($src, @range) = @_;
     my $HANDLE = imap_get_handle($src);
-    my $srcset = imap_range2set($HANDLE, $range);
+    my $srcset = imap_range2set($HANDLE, @range);
 
     imap_delete($HANDLE, $srcset);
 }

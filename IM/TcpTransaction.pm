@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
-my $PM_VERSION = "IM::TcpTransaction.pm version 990905(IM130)";
+my $PM_VERSION = "IM::TcpTransaction.pm version 991025(IM133)";
 
 package IM::TcpTransaction;
 require 5.003;
@@ -16,6 +16,7 @@ require Exporter;
 use IM::Config qw(dns_timeout connect_timeout command_timeout rcv_buf_siz);
 use Socket;
 use IM::Util;
+use IM::Ssh;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -43,7 +44,7 @@ $return_code = &tcp_command(socket, command_string, log_flag);
 =cut
 
 use vars qw($Cur_server $Session_log $TcpSockName
-	    $SOCK @Response $Logging @SockPool);
+	    $SOCK @Response $Logging @SockPool @Sock6Pool);
 BEGIN {
     $Cur_server = '';
     $Session_log = '';
@@ -101,16 +102,45 @@ sub connect_server ($$$) {
 	}
     }
     my ($he_name, $he_alias, $he_type, $he_len, $he_addr, @he_addrs);
-    my ($family, $s, $port, $sin);
+    my ($family, $s, $localport, $remoteport, $sin);
     while ($s = shift(@$servers)) {
 	my ($r) = ($#$servers >= 0) ? 'skipped' : 'failed';
-	# manage server/port notation
-	if ($s =~ /([^\/]*)\/(\d+)$/) {
-	    $port = $2;
+	# manage server[/remoteport]%localport
+	if ($s =~ s/\%(\d+)$//) {
+	    $localport = $1;
+	    $Cur_server = $s;
+	    if ($s =~ s/\/(\d+)$//) {
+		$remoteport = $1;
+	    } else {
+		$remoteport = $se_port;
+	    }
+	    if ($main::SSH_server eq 'localhost') {
+		im_warn( "Don't use port-forwarding to `localhost'.\n" );
+		$Cur_server = "$s/$remoteport";
+	    } else {
+		if ( $remoteport = &ssh_proxy($s,$remoteport,$localport,$main::SSH_server) ) {
+		    $s = 'localhost';
+		    $Cur_server = "$Cur_server%$remoteport";
+		} else { # Connection failed.
+		    im_warn( "Can't login to $main::SSH_server\n" );
+		    if ($proto eq 'smtp') {
+			&log_action($proto, $Cur_server,
+				    join(',', @main::Recipients), $r, @Response);
+		    } else { # NNTP
+			&log_action($proto, $Cur_server,
+				    $main::Newsgroups, $r, @Response);
+		    }
+		    next;
+		}
+	    }
+	}
+	# manage server[/remoteport] notation
+	elsif ($s =~ /([^\/]*)\/(\d+)$/) {
+	    $remoteport = $2;
 	    $s = $1;
-	    $Cur_server = "$s/$port";
+	    $Cur_server = "$s/$remoteport";
 	} else {
-	    $port = $se_port;
+	    $remoteport = $se_port;
 	    $Cur_server = $s;
 	}
 	if ($s =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
@@ -162,7 +192,7 @@ sub connect_server ($$$) {
 
 	foreach $he_addr (@he_addrs) {
 	    if ($root && unixp()) {
-		my $name = priv_sock();
+		my $name = priv_sock($family);
 		if ($name eq '') {
 		    im_err("privilege port pool is empty.\n");
 		    return '';
@@ -183,11 +213,11 @@ sub connect_server ($$$) {
 	    }
 
 	    if ($family == AF_INET) {
-		$sin = &pack_sockaddr_in($port, $he_addr);
+		$sin = &pack_sockaddr_in($remoteport, $he_addr);
 	    } else { # AF_INET6
-		$sin = inet6_pack_sockaddr_in6($family, $port, $he_addr);
+		$sin = inet6_pack_sockaddr_in6($family, $remoteport, $he_addr);
 	    }
-	    im_notice("opening $proto session to $s($port).\n");
+	    im_notice("opening $proto session to $s($remoteport).\n");
 	    alarm(connect_timeout()) unless win95p();
 	    $0 = progname() . ": connecting to $s with $proto";
 	    if (connect (SOCK, $sin)) {
@@ -204,7 +234,7 @@ sub connect_server ($$$) {
 	    alarm(0) unless win95p();
 	    close(SOCK);
 	}
-	im_notice("$proto server $s($port) did not respond.\n");
+	im_notice("$proto server $s($remoteport) did not respond.\n");
 	if ($proto eq 'smtp') {
 	    &log_action($proto, $Cur_server,
 			join(',', @main::Recipients), $r, @Response);
@@ -381,6 +411,13 @@ sub get_cur_server () {
 
 sub pool_priv_sock ($) {
     my $count = shift;
+
+    pool_priv_sock_af($count, AF_INET);
+    pool_priv_sock_af($count, inet6_family());
+}
+
+sub pool_priv_sock_af ($$) {
+    my ($count, $family) = @_;
     my $privport = 1023;
 
     no strict 'refs'; # XXX
@@ -390,14 +427,22 @@ sub pool_priv_sock ($) {
 	$pe_proto = 6;
     }
     while ($count--) {
-	unless (socket(*{$TcpSockName}, AF_INET, SOCK_STREAM, $pe_proto)) {
+	unless (socket(*{$TcpSockName}, $family, SOCK_STREAM, $pe_proto)) {
 	    im_err("socket creation failed: $!.\n");
 	    return -1;
 	}
 	while ($privport > 0) {
-	    my $ANYADDR = pack('C4', 0, 0, 0, 0);
+	    my ($ANYADDR, $psin);
+
 	    im_debug("binding port $privport.\n") if (&debug('tcp'));
-	    my $psin = pack_sockaddr_in($privport, $ANYADDR);
+	    if ($family == AF_INET) {
+		$ANYADDR = pack('C4', 0, 0, 0, 0);
+		$psin = pack_sockaddr_in($privport, $ANYADDR);
+	    } else {
+		$ANYADDR = pack('C16', 0, 0, 0, 0, 0, 0, 0, 0,
+				       0, 0, 0, 0, 0, 0, 0, 0);
+		$psin = inet6_pack_sockaddr_in6($family, $privport, $ANYADDR);
+	    }
 	    last if (bind (*{$TcpSockName}, $psin));
 	    im_warn("privileged socket binding failed: $!.\n")
 		if (&debug('tcp'));
@@ -408,15 +453,27 @@ sub pool_priv_sock ($) {
 	    return -1;
 	}
 	im_notice("pool_priv_sock: $TcpSockName got\n");
-	push(@SockPool, $TcpSockName);
+	if ($family == AF_INET) {
+	    push(@SockPool, $TcpSockName);
+	} else {
+	    push(@Sock6Pool, $TcpSockName);
+	}
 	$TcpSockName++;
     }
     return 0;
 }
 
-sub priv_sock () {
-    return '' if ($#SockPool < 0);
-    my $sock_name = shift(@SockPool);
+sub priv_sock ($) {
+    my ($family) = shift;
+    my ($sock_name);
+
+    if ($family == AF_INET) {
+	return '' if ($#SockPool < 0);
+	$sock_name = shift(@SockPool);
+    } else {
+	return '' if ($#Sock6Pool < 0);
+	$sock_name = shift(@Sock6Pool);
+    }
     im_notice("priv_sock: $sock_name\n");
     return $sock_name;
 }

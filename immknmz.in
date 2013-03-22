@@ -1,0 +1,139 @@
+#! @im_path_perl@
+################################################################
+###
+###			       immknmz
+###	     "mew-nmz-mknmz-all-folders" (in mew-nmz.el)
+###
+### Author:  Shuichi Kitaguchi <kit@Mew.org>
+### Created: Sep 23, 1999
+### Revised: Oct 25, 1999
+###
+
+BEGIN {
+    @im_my_siteperl@
+    @im_src_siteperl@
+};
+
+my $VERSION = "immknmz version 991025(IM133)";
+
+$Prog = 'immknmz';
+
+###
+### Modify these variables if you need.
+###
+my $nmzdir        = "Namazu";	# "~/$nmzdir"
+my $mknmz_args    = "-uUhPq";	# mknmz argument
+my $mknmz_include = "mknmz-inc.pl"; # mknmz -I <file>
+my @ignorefolders = ( "draft", "trash", "schedule", "queue", );
+
+
+# Code:
+
+use IM::Config;
+use IM::Util;
+use IM::Folder;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig $opt_help);
+
+$EXPLANATION = "
+$Prog :: mew-nmz-mknmz-all-folders
+$VERSION
+
+Usage: $Prog [options]
+";
+
+@OptConfig = ( 'help;b;;'  => "Show this message.", );
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV);
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+my $mailpath = mail_path()."/";
+my $namazupath = home_dir()."/$nmzdir/".mail_dir()."/";
+my $incfile = home_dir()."/$nmzdir/$mknmz_include";
+if ( ! -f $incfile ){
+    $incfile = "";
+}
+my $folderspath = $mailpath."/.folders";
+my $msgfolder;
+my $flag;
+my $nmzfolder;
+my $ret;
+my @filelist;
+my $tempfile;
+if ( $ENV{'TEMP'} eq "" ){
+    if ( $ENV{'TMP'} eq "" ){
+	$tempfile = "/tmp"; # UNIX system, may be.
+    } else {
+	$tempfile = $ENV{'TMP'};
+    }
+} else {
+    $tempfile = $ENV{'TEMP'};
+}
+$tempfile =~ s:\\:/:g;
+$tempfile =~ s/\/$//;
+$tempfile = "$tempfile/immknmz_temporary_file";
+
+open( FILE, "<$folderspath" );
+while ( <FILE> ){
+    chomp;
+    $msgfolder = $_;
+    $flag = 0;
+    foreach ( @ignorefolders ){
+	if ( $msgfolder !~ /^\+/ ){		# ! local folder
+	    print "$_\n";
+	    $flag=1;
+	    last;
+	} elsif ( $msgfolder =~ /^\+$_/ ){	# == @ignorefolders
+	    $flag=1;
+	    last;
+	}
+    }
+    if ( $flag != 0 ){
+	print "skipping $msgfolder...\n";
+    } else {
+	$nmzfolder = $msgfolder;
+	$msgfolder =~ s/^\+/$mailpath/g;
+	$nmzfolder =~ s/^\+/$namazupath/g;
+
+	opendir(DIR,$msgfolder);
+	@filelist = grep(/^[0-9]*$/ && -f "$msgfolder/$_",readdir(DIR));
+	closedir(DIR);
+
+	if (&win95p){
+	    $msgfolder =~ s:/:\\:g;
+	}
+
+	if ( scalar(@filelist) > 0 ){
+	    open(TEMPFILE,">$tempfile");
+	    foreach ( @filelist ){
+		if (&win95p){
+		    print TEMPFILE "$msgfolder\\$_\n";
+		} else {
+		    print TEMPFILE "$msgfolder/$_\n";
+		}
+	    }
+	    close(TEMPFILE);
+
+	    create_folder($nmzfolder);
+
+	    print "$Prog: processing $msgfolder ...\n";
+	    if ( $incfile eq "" ){
+#		print "mknmz $mknmz_args -O $nmzfolder -F $tempfile\n";
+		$ret = system "mknmz $mknmz_args -O $nmzfolder -F $tempfile";
+	    } else {
+#		print "mknmz $mknmz_args -O $nmzfolder -F $tempfile -I $incfile\n";
+		$ret = system "mknmz $mknmz_args -O $nmzfolder -F $tempfile -I $incfile";
+	    }
+	    unlink $tempfile;
+	    if ( $ret == 2 ){
+		print "$Prog: abort.\n";
+		last;
+	    }
+	}
+    }
+}
+close(FILE);
+
+# immknmz ends here.

@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Jul  2, 1997
-### Revised: Sep 05, 1999
+### Revised: Oct 25, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imsort version 990905(IM130)";
+my $VERSION = "imsort version 991025(IM133)";
 
 $Prog = 'imsort';
 

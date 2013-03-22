@@ -128,16 +128,18 @@
 [Options concerning server information]
 
   --SMTPservers=<str,>	SMTP servers (and port numbers) are specified
-			(in server_name or server_name/port_number forms).
-			When /port_number is omitted, SMTP(25) will be assumed.
+			(in server_name[/remote_port][%local_port] forms).
+			When /remote_port is omitted, SMTP(25) will be assumed.
+			If local_port is specified, use SSH port forwarding.
   --TryNextOnFatal=<sw>	on: Even if permanent error is detected, try to the
 			next server specified with --SMTPservers option.
 			off: If permanent error is detected, rest of servers
 			are not tried.
   --NNTPservers=<str,>	NNTP servers (and port numbers) are specified
-			(in server_name or server_name/port_number forms).
-			When /port_number is omitted, NNTP(119) will be
-			assumed.
+			(in server_name[/remote_port][%local_port] forms).
+			When /remote_port is omitted, NNTP(119) will be
+			assumed. If local_port is specified, use SSH port 
+			forwarding.
   --EmgSMTPsvrs=<str,>	SMTP servers which should be tried when a message
 			has a permanent error and cannot bounce back to
 			any servers specified with --SMTPservers.
@@ -150,6 +152,7 @@
   --NewsPost=<sw>	on: posting of news is permitted
 			(messages are posted if necessary).
 			off: posting of news is prohibited. 
+  --SSHServer=<str>     Use the specified host as an SSH port relay server.
 
 [Options concerning header field generation]
 
