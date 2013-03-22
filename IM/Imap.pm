@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Jul  4, 2004
+### Revised: Mar  8, 2005
 ###
 
-my $PM_VERSION = "IM::Imap.pm version 20031028(IM146)";
+my $PM_VERSION = "IM::Imap.pm version 20050308(IM148)";
 
 package IM::Imap;
 require 5.003;
@@ -192,7 +192,7 @@ sub imap_get($$) {
     im_notice("getting message $num.\n");
     my $resp = &send_command($HANDLE, "im$seq UID FETCH $num RFC822", '');
     my $failed = 0;
-    if ($resp =~ /^\* \d+ FETCH \((UID $num )?RFC822 \{(\d+)\}/i) {
+    if ($resp =~ /^\* \d+ FETCH \(.*(UID $num )?RFC822 \{(\d+)\}/i) {
 	my $size = $2;
 	alarm(imap_timeout()) unless win95p();
 	while (<$HANDLE>) {

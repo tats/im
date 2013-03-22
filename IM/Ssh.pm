@@ -6,10 +6,10 @@
 ### Author:  Masatoshi Tsuchiya <tsuchiya@pine.kuee.kyoto-u.ac.jp>
 ###	Internet Message Group <img@mew.org>
 ### Created: Oct 05, 1999
-### Revised: Jul  4, 2004
+### Revised: Mar  8, 2005
 ###
 
-my $PM_VERSION = "IM::Ssh.pm version 20031028(IM146)";
+my $PM_VERSION = "IM::Ssh.pm version 20050308(IM148)";
 
 package IM::Ssh;
 require 5.003;

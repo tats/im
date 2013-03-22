@@ -1,3 +1,9 @@
+148 (2005/03/08)
+
+* IM/Imap.pm (imap_get): Fix regexp to fetch imap message.
+* 00readme: Typo fix.
+* dot.im/get.sbr.refile: Use create_folder() when refiling.
+
 147 (2004/07/04)
 
 * imsetup.in, cnf.im/SiteConfig.in, dot.im/Config: Add `MsgIdUser'.

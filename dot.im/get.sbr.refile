@@ -56,9 +56,11 @@ sub get_sub ($$$) {
 #		$new_folder = '+mew-dist';
 	    }
 	    if ($new_folder ne $folder) {
-		$new_file = &message_name($new_folder, 'new') || die $!;
-		&im_notice("refiling $folder/$msg to $new_folder.\n");
-		&im_rename($file, $new_file) || die $!;
+		if (&create_folder($new_folder) == 0) {
+		    $new_file = &message_name($new_folder, 'new') || die $!;
+		    &im_notice("refiling $folder/$msg to $new_folder.\n");
+		    &im_rename($file, $new_file) || die $!;
+		}
 	    }
 	    close(MSG);
 	}
