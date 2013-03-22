@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Feb 28, 2000
+### Revised: Apr 14, 2000
 ###
 
-my $PM_VERSION = "IM::Config.pm version 20000228(IM140)";
+my $PM_VERSION = "IM::Config.pm version 20000414(IM141)";
 
 package IM::Config;
 require 5.003;
@@ -38,7 +38,7 @@ use vars qw(@ISA @EXPORT);
     address addresses_regex
     msgdbfile msgdbtype
     mbox_style
-    nntpservers nntphistoryfile nntpauthuser
+    nntpservers nntphistoryfile nntpauthuser set_nntpauthuser
     popaccount pophistoryfile imapaccount httpproxy noproxy
     usepwagent pwagentport usepwfiles pwfiles
     expand_path usetouchfile touchfile namazuv2
@@ -859,6 +859,10 @@ sub nntphistoryfile () {
 
 sub nntpauthuser () {
     return $NNTPauthuser;
+}
+
+sub set_nntpauthuser($) {
+  $NNTPauthuser = shift;
 }
 
 sub popaccount () {
