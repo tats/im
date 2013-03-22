@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  9, 1997
-### Revised: Dec 13, 2002
+### Revised: Mar 22, 2003
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imsetup version 20021213(IM143)";
+my $VERSION = "imsetup version 20030322(IM144)";
 
 $Prog = 'imsetup';
 
@@ -176,12 +176,14 @@ sub read_conf() {
 			   . " header like Solaris 2.x,\notherwise answer no.)"
 			   , $usecl);
 
-    $nosync = &input_config("Does your system can detect write errors without"
-			    . " fsync(2)? (You can answer yes,\n"
-			    . "if your home directory is on local file system,"
-			    . " otherwise answer no.)"
-			    , $nosync eq 'undefined' ? 'no' : $nosync)
-			    if ($nosync ne 'yes');
+    if ($nosync ne 'yes') {
+	$nosync = 
+	    &input_config("Does your system can detect write errors without"
+			  . " fsync(2)? (You can answer yes,\n"
+			  . "if your home directory is on local file system,"
+			  . " otherwise answer no.)"
+			  , $nosync eq 'undefined' ? 'no' : $nosync);
+    }
 
     print "\n";
 }
@@ -475,6 +477,8 @@ keep=$keep
 #UsePwFiles=yes			# use password files
 #PwFiles=password		# password files (relative to ~/.im/)
 
+#UseTouchFile=yes		# use time-stamp file
+#TouchFile=.mew-touch		# time-stamp file for message folders
 #NamazuV2=yes			# use Namazu version 2 (1.9.x or late)
 #NamazuLockDir=nmzlock		# lock directory (relative to ~/.im/)
 

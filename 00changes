@@ -1,3 +1,19 @@
+144 (2003/03/22)
+
+* IM/Util.pm: Fix `$osname' for darwin. (Thanks to WATANABE Hideyuki)
+* IM/Scan.pm (parse_body): Regexp fix.
+* 00readme: Doc fix.
+* imput.in: Doc fix.
+* imsetup.in, cnf.im/SiteConfig.in, dot.im/Config: Add comments for
+  `UseTouchFile' and `TouchFile'.
+* Fix im_info messages.
+* immknmz.in: Use $ENV{TMPDIR}, $ENV{TEMP}, $ENV{TMP}, or `/tmp'.
+* configure.in, configure: New option, `--enable-usecl'.
+* configure.in, configure: Bug fix for `--disable_rpop'.
+* configure.in, configure: Trimming for `im_fsync_no'.
+* cnf.im/SiteConfig.in: Use `@im_fsync_no@'.
+* Makefile.in: Set mode to 755 instead of 555 for excutables.
+
 143 (2002/12/13)
 
 * The number of the fsync system call is guessed on run time by default.

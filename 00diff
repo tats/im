@@ -1,3 +1,10 @@
+		Differences between IM144 and IM143
+
+* Supporting darwin.
+* Regexp fix for Form=%b.
+* Bug fix for configure options.
+* Doc/message fix.
+
 		Differences between IM143 and IM142
 
 * The number of the fsync system call is guessed on run time by default.
@@ -10,6 +17,7 @@
 * IM/TcpTransaction.pm: Socket6.pm support.
 * IM/MD5.pm: Fix 64bit integer problem.
 * imsetup: Support `User' and `MBoxStyle=qmail'.
+* imsetup: Bug fix for Perl 5.8.0.
 * Minor bug fixes.
 
 		Differences between IM141 and IM140

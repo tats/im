@@ -136,6 +136,8 @@ ToDomain=_domain_when_domain_part_is_omitted_
 #UsePwFiles=yes			# use password files
 #PwFiles=password		# password files (relative to ~/.im/)
 
+#UseTouchFile=yes		# use time-stamp file
+#TouchFile=.mew-touch		# time-stamp file for message folders
 #NamazuV2=yes			# use Namazu version 2 (1.9.x or late)
 #NamazuLockDir=nmzlock		# lock directory (relative to ~/.im/)
 

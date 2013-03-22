@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Dec 13, 2002
+### Revised: Mar 22, 2003
 ###
 
-my $PM_VERSION = "IM::Nntp.pm version 20021213(IM143)";
+my $PM_VERSION = "IM::Nntp.pm version 20030322(IM144)";
 
 package IM::Nntp;
 require 5.003;
@@ -558,13 +558,13 @@ sub nntp_get_msg($$$$) {
 
     if ($how eq 'from') {
 	if ($msgs > 0) {
-	    $msgs = &nntp_xover ($art_start, $art_end);
-	    $msgs = &nntp_head ($art_start, $art_end) if ($msgs < 0);
+	    $msgs = &nntp_xover($art_start, $art_end);
+	    $msgs = &nntp_head($art_start, $art_end) if ($msgs < 0);
 	    if ($msgs < 0) {
 		im_warn("can not get article poster information.\n");
 		return -1;
 	    }
-	im_info("$msgs article(s) in $group at $servers.\n");
+	    im_info("$msgs article(s) in $group at $servers.\n");
 	} else {
 	    im_info("no news in $group at $servers.\n");
 	}
@@ -575,8 +575,7 @@ sub nntp_get_msg($$$$) {
     if ($how eq 'get') {
 	my($last);
 	if ($msgs > 0) {
-	    im_info("Getting new messages from $group at $servers "
-	      . "into $dst....\n");
+	    im_info("Getting new messages from $group at $servers into $dst...\n");
 	    ($msgs, $last) = &nntp_articles($art_start, $art_end, $dst, $limit);
 	    if ($msgs < 0) {
 		im_warn("can not get articles.\n");
