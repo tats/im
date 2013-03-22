@@ -1,0 +1,104 @@
+#! @im_path_perl@
+################################################################
+###
+###				 imrm
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "imrm @im_version@";
+
+$Prog = 'imrm';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Folder;
+use IM::File;
+use IM::Stdio;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_src $opt_noharm $opt_quiet $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+$Prog :: Internet Message Garbage Cleanup
+$VERSION
+
+Usage: $Prog [options] [msgs...]
+";
+
+@OptConfig = (
+    'src;F;;'     => "Set a folder to be cleaned up.",
+    'noharm;b;;'  => "Do not delete files, show what will be performed.",
+    'quiet;b;;'   => "Do not show any messages.",
+    'verbose;b;;' => 'With verbose messages.',
+    'debug;d;;'   => "With debug message.",
+    'help;b;;'    => "Show this message.",
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+my @msgs = @ARGV;
+@msgs = ('all') if (!@ARGV);
+
+imrm($opt_src, @msgs);
+exit $EXIT_SUCCESS;
+
+##
+## work horse
+
+sub imrm ($@) {
+    my ($folder, @msgs) = @_;
+    my @paths = get_message_paths($folder, @msgs);
+    my $i = 0;
+
+    if (scalar(@paths) == 0) {
+	im_warn("no msgs in $folder\n");
+	return;
+    }
+
+    print "unlinking msgs in $folder ... " unless ($opt_noharm || $opt_quiet);
+    flush('STDOUT') unless $opt_noharm;
+
+    foreach (@paths) {
+	im_die("invalid message specification (unlinked $i message(s))\n")
+	    if (!-f $_);
+	im_unlink($_);
+	$i++;
+    }
+
+    print "done\n" unless ($opt_noharm || $opt_quiet);
+    touch_folder($folder) unless $opt_noharm;
+}
+
+### Local Variables:
+### mode: perl
+### End:

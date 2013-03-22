@@ -1,0 +1,284 @@
+# -*-Perl-*-
+################################################################
+###
+###			     MsgStore.pm
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $PM_VERSION = "IM::MsgStore.pm @im_version@";
+
+package IM::MsgStore;
+require 5.003;
+require Exporter;
+
+use Fcntl;
+use IM::Config;
+use IM::Folder;
+use IM::Header;
+#use IM::Message;
+use integer;
+use strict;
+use vars qw(@ISA @EXPORT);
+
+@ISA = qw(Exporter);
+@EXPORT = qw(store_message exec_getsbrfile open_fcc excl_create);
+
+=head1 NAME
+
+MsgStore - store message in MH-style folder
+
+=head1 SYNOPSIS
+
+=head1 DESCRIPTION
+
+=cut
+
+use vars qw($MsgNum $First $Last $PrevDst);
+BEGIN {
+    $MsgNum = 0;
+    $First = 0;
+    $Last = 0;
+    $PrevDst = '';
+}
+
+##### OPEN A FILE TO SAME NEW MESSAGE IN MAIL FOLDER #####
+#
+# new_message(handle, folder_name)
+#	folder_name: a folder name to be saved in
+#	return value:
+#		success: file name to be saved
+#		fail: NULL
+#
+sub new_message (\*$) {
+    (local *MESSAGE, my $folder) = @_;
+    if ($MsgNum == 0) {
+	$MsgNum = &message_number($folder, 'new');
+	if ($MsgNum == 0) {
+	    im_warn("can't get new message number in $folder\n");
+	    return '';
+	}
+	$First = $Last = $MsgNum;
+    } else {
+	$MsgNum++;
+    }
+    my $try = 3;
+    while ($try--) {
+	my $file = &message_name($folder, $MsgNum);
+	im_notice("creating file: $file\n");
+	unless ($file) {
+	    # message path allocation failed
+	    return '';
+	}
+	if (&excl_create(\*MESSAGE, $file) == 0) {
+	    # created successfully
+	    $Last = $MsgNum;
+	    return "$folder/$MsgNum";
+	}
+	$MsgNum++;
+    }
+    im_warn("excl_create failed.\n");
+    # message creation failed
+    return '';
+}
+
+sub store_message ($$) {
+    my ($Msg, $dst) = @_;
+    local *ART;
+    require IM::Scan && import IM::Scan;
+
+    im_notice("saving the message into $dst\n");
+    if ($PrevDst ne $dst) {
+	if (create_folder($dst) < 0) {
+	    return -1;
+	}
+	touch_folder($dst);
+	$PrevDst = $dst;
+    }
+    my $file = &new_message(\*ART, $dst);
+    my $size = 0;
+    if ($file ne '') {
+	my $line;
+	my $hcount = 0;
+	my $inheader = 1;
+	im_notice("creating $file\n");
+	foreach $line (@$Msg) {
+	    $size += length($line);
+	    if ($line eq "\n") {
+		$inheader = 0;
+	    }
+	    $hcount++ if ($inheader);
+	    unless (print ART $line) {
+		im_err("writing to $file failed ($!).\n");
+		close(ART);
+		return -1;
+	    }
+	}
+	unless (close(ART)) {
+	    im_err("writing to $file failed ($!).\n");
+	    return -1;
+	}
+
+	my @Hdr = @$Msg[0..$hcount];
+	my %Head;
+	&store_header(\%Head, join('', @Hdr));
+
+	unless ($main::opt_noscan) {
+	    splice(@$Msg, 0, $hcount);
+	    $Head{'body:'} = &parse_body($Msg, 1);
+
+#	    $Head{'bytes:'} = $size;
+	    $Head{'kbytes:'} = int(($size + 1023) / 1024);
+	    ($Head{'number'} = $file) =~ s/^.*\///;
+	    $Head{'folder'} = $dst;
+	    &parse_header(\%Head);
+#	    if ($main::opt_thread) {
+#		&make_thread(%Head);
+#	    } else {
+		&disp_msg(\%Head);
+		$main::scan_count++;
+#	    }
+	}
+
+	my $mid = $Head{'message-id'};
+#	my $dt = $Head{'date'};
+	(my $ver = $Head{'mime-version'}) =~ s/\s//g;
+	my $master = '';
+	if ($ver eq '1.0') {
+	    my $ct = $Head{'content-type'} . ';';
+	    $ct =~ s/\s//g;
+	    if ($ct =~ m|^Message/partial;(.*;)?id=([^;]+);|i) {
+		$master = $2;
+		$master =~ s/^"(.*)"$/$1/;
+	    }
+	}
+	if (&msgdbfile() ne '' && $mid ne '') {
+	    require IM::History && import IM::History;
+
+	    unless (open_history(1) < 0) {
+		store_history($mid, $file);
+		store_history("partial:$master", $mid) if ($master ne '');
+		close_history();
+	    }
+	}
+	return 0;
+    } else {
+	im_err("message can not be saved to $dst.\n");
+	return -1;
+    }
+}
+
+sub exec_getsbrfile ($) {
+    my $dst = shift;
+    my $get_hook = getsbrfile();
+    if ($get_hook) {
+	if ($main::INSECURE) {
+	    im_warn("Sorry, GetSbr is ignored for SUID root script\n");
+	    return;
+	}
+	if ($get_hook =~ /^(\S+)$/) {
+	    $get_hook = $1;        # to pass through taint check
+	    if (-f $get_hook) {
+		require $get_hook;
+	    } else {
+		im_err("get subroutine file $get_hook not found.\n");
+	    }
+	}
+	eval { &get_sub($dst, $First, $Last); };
+	if ($@) {
+	    im_warn("Form seems to be wrong.\nPerl error message is: $@");
+	}
+    }
+    return;
+}
+
+##### OPEN FILE FOR FCC #####
+#
+# open_fcc(folder_name, save_style)
+#	folder_name: a folder name to be saved in
+#	save_style:
+#		0 = messages in a file
+#		1 = separated messages in a directory
+#	return values: (handle, fcc_dir, path, rm_file_on_error)
+#	  handle:
+#		NULL  : failed
+#		Handle: success
+#	  fcc_dir: directory name
+#	  path: file name to be saved
+#	  rm_file_on_error: a path to be deleted on error
+#
+sub open_fcc ($$) {
+    my ($folder, $dir_style) = @_;
+    my ($fcc_dir, $rm_file_on_error, $fcc_folder, $FILE, $path);
+    $fcc_folder = &expand_path($folder);
+
+    if (-d $fcc_folder) {
+	$fcc_dir = 1;
+    } elsif (-f $fcc_folder) {
+	$fcc_dir = 0;
+    } else {
+	# set default style unless exists
+	$fcc_dir = $dir_style;
+    }
+    im_debug("FCC style: ".($fcc_dir?"Dir":"File")."\n") if (&debug('fcc'));
+
+    unless ($fcc_dir) {
+	msg_mode(1);
+	im_debug("FCC file: $fcc_folder\n") if (&debug('fcc'));
+	unless (open(FCC, ">>$fcc_folder")) {
+	    im_warn("can't open FCC file: $fcc_folder\n");
+	    return undef;
+	}
+
+	my $date = &gen_date(2);
+	unless (print(FCC "From $main::Sender $date\n")) {
+	    close(FCC);
+	    im_warn("can't write FCC file: $fcc_folder\n");
+	    return undef;
+	}
+	$path = $folder;
+	$rm_file_on_error = '';
+    } else {
+	unless (-d $fcc_folder) {
+	    if (create_folder($fcc_folder) < 0) {
+		im_warn("can't create folder: $fcc_folder\n");
+		return undef;
+	    }
+	}
+	my $file = &new_message(\*FCC, $fcc_folder);
+	return undef if ($file eq '');
+	touch_folder($file);
+	$rm_file_on_error = $file;
+	im_debug("FCC storing in $file\n")
+	  if (&debug('fcc'));
+	$file =~ /(\d+)$/;
+	$path = "$folder/$1";
+    }
+    return (\*FCC, $fcc_dir, $path, $rm_file_on_error);
+}
+
+# excl_create(handle, file)
+#	file: path of file to be created exclusively
+#	handle: file handle
+#	return value:
+#	  0: success
+#	 -1: fail
+#
+sub excl_create (*$) {
+    (local *MESSAGE, my $file) = @_;
+    msg_mode(1);
+    return -1 unless (sysopen(MESSAGE, $file, O_RDWR|O_CREAT|O_EXCL));
+#   return -1 if (-f $file);
+#   return -1 unless (open(MESSAGE, ">$file"));
+    return 0;
+}
+
+1;

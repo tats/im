@@ -1,0 +1,133 @@
+#! @im_path_perl@
+################################################################
+###
+###				impack
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "impack @im_version@";
+
+$Prog = 'impack';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Folder;
+use IM::File;
+use IM::Stdio;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_src $opt_noharm $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+$Prog :: Internet Message Pack
+$VERSION
+
+usage: $Prog [options] [+folder]
+";
+
+@OptConfig =(
+    'src;F;;'     => "Set source folder.",
+    'noharm;b;;'  => "No packing. Show what will happen.",
+    'verbose;b;;' => 'With verbose messages.',
+    'debug;d;;'   => "With debug message.",
+    'help;b;;'    => "Show this message.",
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+impack($opt_src);
+exit $EXIT_SUCCESS;
+
+##################################################
+##
+## Work horse
+##
+sub impack ($) {
+    my $folder = shift;
+    my $msg = 1;
+    my $dst;
+
+    chk_folder_existance($folder);          # not return in case false.
+
+    my @paths = impath($folder, 'all');
+
+    print "packing messages in $opt_src ... " unless $opt_noharm;
+    flush('STDOUT') unless $opt_noharm;
+
+    foreach (@paths) {
+	$dst = $_;
+	$dst =~ s|[^/]+$|$msg++|e;
+	if ($_ ne $dst){
+	    im_rename($_, $dst) || die $@;   # XXX
+	}
+    }
+
+    print "done\n" unless $opt_noharm;
+    touch_folder($folder) unless $opt_noharm;
+}
+
+##
+## Check folder existance.
+##
+sub chk_folder_existance (@) {
+    my @folders = @_;
+    my $path;
+
+    im_debug("chk_folder_existance: folder: @folders\n") if (&debug('all'));
+
+    foreach (@folders){
+	$path = impath($_);
+
+	im_die("No folder $_. (Nothing was refiled.)\n")
+	    if (!-d $path);
+	im_die("Folder $_ is not writable. (Nothing was refiled.)\n")
+	    if (!-w $path);
+    }
+    im_debug("chk_folder_existance: OK.\n") if (&debug('all'));
+}
+
+sub impath ($@) {
+    my $folder = shift;
+    my @msgs  = @_;
+    my @paths;
+
+    im_debug("impath: folder: $folder msgs: @msgs\n") if (&debug('all'));
+    @paths = get_message_paths($folder, @msgs);
+    im_debug("impath: paths: @paths\n") if (&debug('all'));
+
+    return wantarray ? @paths : $paths[0];
+}
+
+### Local Variables:
+### mode: perl
+### End:

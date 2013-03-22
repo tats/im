@@ -1,0 +1,247 @@
+# -*-Perl-*-
+################################################################
+###
+###			      EncDec.pm
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $PM_VERSION = "IM::EncDec.pm @im_version@";
+
+package IM::EncDec;
+require 5.003;
+require Exporter;
+
+use IM::Config;
+use integer;
+use strict;
+use vars qw(@ISA @EXPORT);
+
+@ISA = qw(Exporter);
+@EXPORT = qw(mime_encode_string mime_decode_string
+		b_encode_string b_decode_string
+		q_encode_string q_decode_string);
+
+=head1 NAME
+
+EncDec - MIME header encoder/decoder
+
+=head1 SYNOPSIS
+
+    use IM::EncDec;
+
+    $mime_header_encoded_string =
+	mime_encode_string(string, iso7bit, iso8bit);
+    $string =
+	mime_decode_string(mime_header_encoded_string);
+
+    $B_encoded_string = b_encode_string(string);
+    $string = b_decode_string(B_encoded_string);
+
+    $Q_encoded_string = q_encode_string(string);
+    $string = q_decode_string(Q_encoded_string);
+
+=head1 DESCRIPTION
+
+MIME header encoder/decoder package.
+
+    $_ = "JAPANESE (Kazuhiko Yamamoto)";
+    mime_encode_string($_, 'iso-2022-jp', 'iso-8859-1');
+	=> =?iso-2022-jp?B?GyRCOzNLXE9CSScbKEI=?=
+		  (Kazuhiko Yamamoto)
+
+    s/\n[\t ]+//g;
+    print mime_decode_string($_), "\n";
+	=> "JAPANESE (Kazuhiko Yamamoto)"
+
+=cut
+
+use vars qw(@D2H 
+	    $mime_encode_switch
+	    $mime_decode_switch
+	    @Base64a %Base64b);
+
+##################################################
+##
+## Variables
+##
+
+@D2H = ('0'..'9', 'A'..'F');
+
+##################################################
+##
+## Switches
+##
+
+$mime_encode_switch = {
+    B => \&b_encode_string,
+    Q => \&q_encode_string,
+};
+
+$mime_decode_switch = {
+    B => \&b_decode_string,
+    Q => \&q_decode_string,
+};
+
+##################################################
+##
+## String Encoder/Decoder
+##
+
+sub mime_encode_string ($$$) {
+    my($str, $iso7, $iso8) = (@_);
+    my($point, $len, $nstr, $s) = (0, length($str), '', '');
+    my($single, $double) = ('', '');
+    my($in) = (0);
+
+    while ($point < $len) {
+	$s = substr($str, $point, 1);
+	$point ++;
+	if ($s eq chr(27)) {
+	    if ($nstr ne '') {
+		$nstr = $nstr . "\t";
+	    }
+	    if ($in == 0) {
+		# IN
+		$in = 1;
+		if ($single ne '') {
+		    if ($single =~ /[\x00-\x1f\x80-\xff]/) {
+			$single = &Q_encode_string($single);
+			$nstr = $nstr . '=?' . $iso8 . '?Q?' . $single . "?=\n";
+		    } else {
+			$nstr = $nstr . $single. "\n";
+		    }
+		    $single = '';
+		}
+	    } else {
+		# OUT
+		$in = 0;
+		$double = $double . $s . substr($str, $point, 2);
+		$point = $point + 2;
+		$s = substr($str, $point, 1);
+		$point ++;
+
+		$double = &B_encode_string($double);
+		$nstr = $nstr . '=?' . $iso7 . '?B?' . $double . '?=';
+		$double = '';
+
+		while ($s eq ' ') {
+		    $nstr = $nstr . ' ';
+		    $s = substr($str, $point, 1);
+		    $point ++;
+		}
+		$nstr = $nstr . "\n";
+	    }
+	}
+	if ($in == 1) {
+	    $double = $double . $s;
+	} else {
+	    $single = $single . $s;
+	}
+    }
+    if ($single ne '') {
+	if ($nstr ne '') {
+	    $nstr = $nstr . "\t";
+	}
+	if ($single =~ /[\x00-\x1f\x80-\xff]/) {
+	    $single = &Q_encode_string($single);
+	    $nstr = $nstr . '=?' . $iso8 . '?Q?' . $single . "?=\n";
+	} else {
+	    $nstr = $nstr . $single. "\n";
+	}
+    }
+    return $nstr;
+}
+
+sub mime_decode_string ($) {
+    my $in = shift;
+    return '' unless $in;
+    $in =~ s/\?=\s+=\?/?==?/g;
+    $in =~ s/(=\?([^?]+)\?(.)\?([^?]+)\?=)/
+      ($$mime_decode_switch{uc($3)})?&{$$mime_decode_switch{uc($3)}}($4):$1/ge;
+#   while ($in =~ /^(.*)=\?([^?]+)\?(.)\?([^?]+)\?=(.*)$/) {
+#	if ($$mime_decode_switch{uc($3)}) {
+#	    $in = $1 . &{$$mime_decode_switch{uc($3)}}($4) . $5;
+#	}
+#   }
+    return $in;
+}
+
+##################################################
+##
+## B Encoder/Decoder
+##
+
+sub b_encode_string ($) {
+    my $mod3 = length($_[0]) % 3;
+    local($_);
+
+    $_ = pack('u', $_[0]);
+    chop;
+    s/(^|\n).//mg;
+    tr[`!-_][A-Za-z0-9+/];
+
+    if    ($mod3 == 1) { s/..$/==/; }
+    elsif ($mod3 == 2) { s/.$/=/; }
+
+    $_;
+}
+
+sub b_decode_string ($) {
+    my $s64 = shift;
+    my $len;
+    my $res = '';
+    local($_);
+
+    while ($s64 =~ s/^(.{1,60})//) {
+	$_ = $1;
+
+	$len = length($_) * 3 / 4;
+	if (/(=+)$/) {
+	    $len -= length($1);
+	}
+	tr[A-Za-z0-9+/=][`!-_A];
+
+	$res .= sprintf("%c%s\n", $len + 32, $_);
+    }
+    unpack('u', $res);
+}
+
+##################################################
+##
+## Q Encoder/Decoder
+##
+
+sub q_encode_string ($;$) {
+    my($line, $struct) = @_;
+    local($_);
+
+    $_ = $line;
+    if (defined($struct) && $struct) {
+	s/([^\w\d\!\*\+\-\/ ])/sprintf("=%02X", unpack('C', $1))/ge;
+    } else {
+	s/([^\!-<>\@-\^\`-\~ ])/sprintf("=%02X", unpack('C', $1))/ge;
+    }
+    s/ /_/g;
+    $_;
+}
+
+sub q_decode_string ($) {
+    my($qstr) = @_;
+    local($_);
+
+    $_ = $qstr;
+    s/_/ /g;
+    s/(=)([0-9A-Za-z][0-9A-Za-z])/chr(hex('0x'. $2))/ge;
+    $_;
+}
+
+1;

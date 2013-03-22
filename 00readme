@@ -1,0 +1,80 @@
+			   Internet Message
+
+
+			   <<<Copyright>>>
+
+This package provides a series of user interface commands (im*
+commands) and backend Perl5 libraries to integrate Email and NetNews
+user interface. They are designed to be used both from Mew and on
+command line.
+
+The folder style for Mew is exactly the same as that of MH. So, you
+can replace MH with this package without any migration
+works. Moreover, you are able to operate your messages both by IM and
+MH with consistent manner.
+
+All programs/libraries conforms GPL2. This means, in short words, free
+but no warranty. You have to provide whole source code if you
+distribute. 
+
+			  <<<Installation>>>
+
+* Install Perl 5.004 or later if not installed. For more information,
+see 00perl.
+
+* Execute "configure".
+
+	% ./configure
+
+If you want to use RPOP, execute "configure" with the "--enable-rpop"
+option.
+
+	% ./configure --enable-rpop
+
+If you specify this option, "imget" will be made as "setuid root" for
+RPOP. APOP is the default. (Set Imget.Src as you like according the
+syntax that "imget -h" displays.)
+
+
+* To run programs in place, set IM_SYS_DIR so that they can read the
+Config file.
+
+	csh% setenv IM_SYS_DIR <dir_for_make>/cnf.im
+
+	sh% IM_SYS_DIR=<dir_for_make>/cnf.im
+	sh% export IM_SYS_DIR
+
+	% imls
+
+
+* Install them.
+
+	% su
+	# make install
+
+
+* Setup "/usr/local/lib/im/SiteConfig" and "~/.im/Config". An example is
+found in "cnf.im/SiteConfig" and "dot.im/Config",
+respectively. 'imsetup' would help you.
+
+
+		 <<<Contributions and Bug Reports>>>
+
+Please send comments, bug reports, and patches to "img@mew.org".
+
+
+
+			  <<<Programmers>>>
+
+		Junichiro ITO           <itojun@mew.org>
+		 Yoshiaki KASAHARA    <kasahara@mew.org>
+		 Motonori NAKAMURA    <motonori@mew.org>
+		 Kazunori NISHI       <kazunori@mew.org>
+		Yoshinari NOMURA           <nom@mew.org>
+		 Hidenori OHTA            <hide@mew.org>
+                 Fujikazu OKUNISHI    <fuji0924@mbox.kyoto-inet.or.jp>
+                 Kiyotaka SAKAI         <ksakai@mew.org>
+                Toshihiko SHIMOKAWA      <toshi@mew.org>
+                Fumitoshi UKAI            <ukai@jp.hpl.hp.com>
+                 Kazumasa UTASHIRO    <utashiro@mew.org>
+		     Kazu YAMAMOTO        <kazu@mew.org>

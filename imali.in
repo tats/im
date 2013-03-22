@@ -1,0 +1,122 @@
+#! @im_path_perl@
+################################################################
+###
+###				 imali
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "imali @im_version@";
+
+$Prog = 'imali';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Alias;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_aliasesfile $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+$Prog :: Internet Message Query Alias
+$VERSION
+
+Usage: $Prog [options] [target...]
+";
+
+@OptConfig = (
+    'aliasesfile;s;;' => "Set aliases file.",
+    'verbose;b;;' => 'With verbose messages.',
+    'debug;d;;'   => "With debug message.",
+    'help;b;;'    => "Show this message.",
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+# parse argument
+my @targets = @ARGV;
+my $i;
+
+$opt_aliasesfile = &expand_path($opt_aliasesfile);
+if (! -f $opt_aliasesfile) {
+    im_warn("no alias file $opt_aliasesfile\n");
+    exit $EXIT_SUCCESS;
+}
+&open_aliases($opt_aliasesfile);
+if (scalar(@targets) == 0) {
+    local $, = "\n";
+    print &list_mail_aliases, "\n";
+} else {
+    foreach $i (@targets) {
+	print &alias_lookup($i), "\n";
+    }
+}
+&close_aliases();
+
+exit $EXIT_SUCCESS;
+
+__END__
+
+=head1 NAME
+
+imali - Display mail aliases
+
+=head1 SYNOPSIS
+
+B<imali> [B<--aliasesfile=file>] [B<--help>] [targets ...]
+
+=head1 DESCRIPTION
+
+I<Imali> searches the named mail alias files for each of the given
+aliases.  It creates a list of addresses for those aliases, and writes
+that list on standard output.  If I<targets> are omitted, all aliases
+are displayed.
+
+=head1 OPTIONS
+
+=over 5
+
+=item I<-a, --aliasfile = file>
+
+Use I<file> as a aliasfile. Default is ~/.im/Aliases.
+
+=item I<-h, --help>
+
+Print a usage message on standard output and exit successfully.
+
+=back
+
+=cut
+
+### Local Variables:
+### mode: perl
+### End:

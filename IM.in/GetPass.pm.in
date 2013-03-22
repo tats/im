@@ -1,0 +1,211 @@
+# -*-Perl-*-
+################################################################
+###
+###				GetPass.pm
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 30, 1997
+### Revised: @im_revised@
+###
+
+my $PM_VERSION = "IM::GetPass.pm @im_version@";
+
+package IM::GetPass;
+require 5.003;
+require Exporter;
+
+use IM::Config;
+use IM::Stdio;
+use integer;
+use strict;
+use vars qw(@ISA @EXPORT);
+
+@ISA = qw(Exporter);
+@EXPORT = qw(getpass loadpass savepass connect_agent talk_agent findpass);
+
+=head1 NAME
+
+GetPass - Get password from tty or ...
+
+=head1 SYNOPSIS
+
+$password = &getpass(prompt_string);
+
+=head1 DESCRIPTION
+
+=cut
+
+sub getpass ($) {
+    my ($prompt) = @_;
+    my ($secret, $termios, $c_lflag);
+
+    unless (win95p()) {
+	# POSIX doesn't exist for Win95, sigh.
+	# stty is not effective for Mule since it's not
+	# terminal base, sigh.
+	# Anyway, Mew never echos back even if getpass echos back.
+	require POSIX && import POSIX;
+
+	$termios = new POSIX::Termios;
+	$termios->getattr(fileno(STDIN));
+	$c_lflag = $termios->getlflag;
+	$termios->setlflag($c_lflag & ~&POSIX::ECHO);
+	$termios->setattr(fileno(STDIN), &POSIX::TCSANOW);
+    }
+
+    print STDERR $prompt;
+    flush('STDERR');
+    chomp($secret = <STDIN>);
+    print STDERR "\n";
+
+    unless (win95p()) {
+	$termios->setlflag($c_lflag);
+	$termios->setattr(fileno(STDIN), &POSIX::TCSANOW);
+    }
+
+    return $secret;
+}
+
+sub loadpass ($$$$) {
+    my ($proto, $auth, $path, $user) = @_;
+    local ($_);
+    my $key = &connect_agent(0);
+    return '' if ($key eq '');
+    my @keys = unpack('C*', $key);
+    my $pass = &talk_agent("LOAD\t$proto\t$auth\t$path\t$user\n");
+    if ($pass =~ /^PASS\t(.*)/) {
+	my @tmp1 = unpack('C*', pack('H*', $1));
+	my $sum1 = $keys[0];
+	foreach (@tmp1) {
+	    $sum1 += $keys[1];
+	    my $tmp2 = $_;
+	    $_ -= $sum1;
+	    $_ &= 0xff;
+	    $sum1 = $tmp2;
+	}
+	return pack('C*', @tmp1);
+    } else {
+	return '';
+    }
+}
+
+sub savepass ($$$$$) {
+    my ($proto, $auth, $path, $user, $pass) = @_;
+    local ($_);
+    my $key = &connect_agent(0);
+    return '' if ($key eq '');
+    my @keys = unpack('C*', $key);
+    my @tmp1 = unpack('C*', $pass);
+    my $sum1 = $keys[0];
+    foreach (@tmp1) {
+	$sum1 += $_ + $keys[1];
+	$sum1 &= 0xff;
+	$_ = $sum1;
+    }
+    $pass = unpack('H*', pack('C*', @tmp1));
+    &talk_agent("SAVE\t$proto\t$auth\t$path\t$user\nPASS\t$pass\n", 0);
+}
+
+sub connect_agent ($) {
+    my ($surpresserror) = shift;
+    require Socket && import Socket;
+
+    my $realuser = login_name();
+    unless ($realuser) {
+	im_warn("pwagent: can not get login name\n") unless ($surpresserror);
+	return '';
+    }
+    my $dir = "/tmp/im-$realuser";
+
+    my $port = &pwagentport();
+    if ($port > 0) {
+	unless (socket(SOCK, &AF_INET, &SOCK_STREAM, 0)) {
+	    im_warn("pwagent: socket: $!\n") unless ($surpresserror);
+	    return '';
+	}
+	my $sin = sockaddr_in($port, inet_aton('127.0.0.1'));
+	unless (connect(SOCK, $sin)) {
+	    im_warn("pwagent: connect: $!\n") unless ($surpresserror);
+	    return '';
+	}
+    } else {
+	my $name = "$dir/pw";
+
+	unless (-S $name) {
+	    im_warn("pwagent: can not access to socket: $name\n")
+		unless ($surpresserror);
+	    return '';
+	}
+
+	my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev) = stat($dir);
+	if ($mode & 0077) {
+	    im_warn("pwagent: invalid mode: $dir\n") unless ($surpresserror);
+	    return '';
+	}
+	($dev,$ino,$mode,$nlink,$uid,$gid,$rdev) = stat($name);
+	if ($mode & 0077) {
+	    im_warn("pwagent: invalid mode: $name\n") unless ($surpresserror);
+	    return '';
+	}
+
+	unless (socket(SOCK, &AF_UNIX, &SOCK_STREAM, 0)) {
+	    im_warn("pwagent: socket: $!\n") unless ($surpresserror);
+	    return '';
+	}
+	my $sun = sockaddr_un($name);
+	unless (connect(SOCK, $sun)) {
+	    im_warn("pwagent: connect: $!\n") unless ($surpresserror);
+	    return '';
+	}
+    }
+    select(SOCK); $| = 1; select(STDOUT);
+    my $res = <SOCK>;
+    chomp($res);
+    return $res;
+}
+
+sub talk_agent ($) {
+    my ($msg) = shift;
+    print SOCK $msg;
+    my $res = <SOCK>;
+    shutdown (SOCK, 2);
+    close(SOCK);
+    chomp($res);
+    return $res;
+}
+
+sub findpass($$$$) {
+    my ($proto, $auth, $host, $user) = @_;
+    local ($_);
+    my ($passfile);
+
+    foreach $passfile (split(',', &pwfiles())) {
+	$passfile = &expand_path($passfile);
+	next unless (open (PASSFILE, "<$passfile"));
+	while (<PASSFILE>) {
+	    chomp;
+	    next if (/^(#.*)?$/); 
+	    s/\s+(\#.*)?$//;	# remove comments
+	    my ($tmp_proto_auth, $tmp_host, $tmp_user, $tmp_pass) = split;
+	    my ($tmp_proto, $tmp_auth) = split('/', $tmp_proto_auth);
+	    if (($tmp_proto eq $proto)
+		&& ($tmp_auth eq $auth)
+		&& ($tmp_host eq $host)
+		&& ($tmp_user eq $user)) {
+		close (PASSFILE);
+		return $tmp_pass;
+	    }
+	}
+	close (PASSFILE);
+    }
+
+    return '';
+}
+
+1;

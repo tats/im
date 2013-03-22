@@ -1,0 +1,292 @@
+# -*-Perl-*-
+################################################################
+###
+###			    History.pm
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Jul 6, 1997
+### Revised: @im_revised@
+###
+
+my $PM_VERSION = "IM::History.pm @im_version@";
+
+package IM::History;
+require 5.003;
+require Exporter;
+
+use Fcntl;
+use IM::Config;
+use integer;
+use strict;
+use vars qw(@ISA @EXPORT);
+
+@ISA = qw(Exporter);
+@EXPORT = qw(
+	LookUpAll LookUpMsg
+	open_history close_history
+	store_history lookup_history delete_history dump_history
+	rename_history link_history
+);
+
+use vars qw($DBtype $locked $nodbfile $DB_HASH %History);
+
+sub LOCK_SH { 1 }
+sub LOCK_EX { 2 }
+sub LOCK_NB { 4 }
+sub LOCK_UN { 8 }
+
+
+sub LookUpAll  { -1 }
+sub LookUpMsg  {  0 }
+#sub LookUpDate {  1 }
+
+
+sub open_history ($) {
+    my ($with_lock) = @_;
+    $DBtype = msgdbtype();	# package global
+    unless ($DBtype) {
+	$DBtype = '@im_db_type@';
+    }
+
+    $locked = 0;
+
+    my $dbfile = msgdbfile();
+    if ($dbfile eq '') {
+	$nodbfile = 1;
+	return -2;
+    }
+
+    if ($DBtype eq 'DB') {
+	require DB_File && import DB_File;
+	$DB_HASH->{'cachesize'} = 100000 ;
+    } elsif ($DBtype eq 'NDBM') {
+	require NDBM_File && import NDBM_File;
+    } elsif ($DBtype eq 'SDBM') {
+	require SDBM_File && import SDBM_File;
+    } elsif ($DBtype eq '') {
+	im_err("no DB type defined.\n");
+	return -2;
+    } else {
+	im_err("DB type $DBtype is not supported.\n");
+	return -2;
+    }
+
+    im_debug("history database: $dbfile\n") if (&debug('history'));
+
+    my ($db, $fd);
+    if ($DBtype eq 'DB') {
+	$db = tie %History, 'DB_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
+    } elsif ($DBtype eq 'NDBM') {
+	$db = tie %History, 'NDBM_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
+    } elsif ($DBtype eq 'SDBM') {
+	$db = tie %History, 'SDBM_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
+    }
+
+    unless ($db) {
+	im_err "history: can not access $dbfile ($!)\n";
+	return -1;
+    }
+    if ($DBtype eq 'DB') {
+	$fd = $db->fd;
+	if ($fd < 0) {
+	    im_err "history: can not access $dbfile (fd = $fd)\n";
+	    return -1;
+	}
+    }
+
+    return 0 unless ($with_lock);
+
+    if ($DBtype eq 'DB') {
+	unless (open(HIST_FH, "+<&=$fd")) {
+	    im_err "history: dup $fd ($!)\n";
+	    return -1;
+	}
+    } elsif ($DBtype eq 'NDBM' or $DBtype eq 'SDBM') {
+	unless (open(HIST_FH, "+<$dbfile.pag")) {
+	    im_err "history: open $dbfile.pag ($!)\n";
+	    return -1;
+	}
+    }
+
+    unless (flock (HIST_FH, LOCK_EX | LOCK_NB)) {
+	im_warn "history: waiting for write lock ($!)\n";
+	unless (flock (HIST_FH, LOCK_EX)) {
+	    im_err "history: flock ($!)\n";
+	    return -1;
+	}
+    }
+    $locked = 1;
+    return 0;
+}
+
+
+sub close_history () {
+    if ($nodbfile) {
+	im_err("no database specified.\n");
+	return;
+    }
+    if ($locked) {
+	flock(HIST_FH, LOCK_UN);
+    }
+    untie %History;
+    if ($locked) {
+	close(HIST_FH);
+    }
+    $locked = 0;
+}
+
+
+sub lookup_history ($$) {
+    if ($nodbfile) {
+	im_err("no database specified.\n");
+	return ();
+    }
+    my ($msgid, $field) = @_;
+    $msgid =~ s/^<(.*)>$/$1/;
+    if (defined($History{$msgid})) {
+	if ($field == LookUpAll) {
+	    return split("\t", $History{$msgid});
+	} else {
+	    my @flds = split("\t", $History{$msgid});
+	    return $flds[$field];
+	}
+    } else {
+	if ($field == LookUpAll) {
+	    return ();
+	} else {
+	    return '';
+	}
+    }
+}
+
+sub store_history ($$) {
+    if ($nodbfile) {
+	im_err("no database specified.\n");
+	return -1;
+    }
+    my ($msgid, $folder) = @_;
+    $msgid =~ s/^<(.*)>$/$1/;
+    im_notice("add to history: $msgid\t$folder\n");
+    if (defined($History{$msgid})) {
+	my ($ofolder) = split("\t", $History{$msgid});
+	if (scalar(grep($folder eq $_, split(',', $ofolder)))) {
+	    return;
+	}
+	$folder = "$ofolder,$folder";
+    }
+    $History{$msgid} = $folder;
+}
+
+sub delete_history ($$) {
+    if ($nodbfile) {
+	im_err("no database specified.\n");
+	return -1;
+    }
+    my ($msgid, $folder) = @_;
+    $msgid =~ s/^<(.*)>$/$1/;
+    if (defined($History{$msgid})) {
+	if ($folder ne '') {
+	    my ($f) = split("\t", $History{$msgid});
+	    my (@list, $found);
+	    foreach (split(',', $f)) {
+		if ($_ eq $folder) {
+		    $found = 1;
+		} else {
+		    push(@list, $_)
+		}
+	    }
+	    return -1 unless ($found);
+	    if ($#list < 0) {
+		delete $History{$msgid};
+		return 0;
+	    } else {
+		$History{$msgid} = join(',', @list);
+		return ($#list + 1);
+	    }
+	} else {
+	    delete $History{$msgid};
+	    return 0;
+	}
+    } else {
+	return -1;
+    }
+}
+
+
+sub dump_history () {
+    if ($nodbfile) {
+	im_err("no database specified.\n");
+	return;
+    }
+    my ($key, $val);
+    while (($key, $val) = each(%History)) {
+	print "$key\t$val\n";
+    }
+}
+
+sub rename_history ($$$) {
+    if ($nodbfile) {im_err("no database specified.\n"); return;}
+
+    my ($id, $m1, $m2) = @_;
+    $id =~ s/<(.*)>/$1/;
+
+    my $h;
+    if (defined $History{$id}){
+	$h = $History{$id};
+	$h =~ s/^([^\t]+)(.*)//;
+	$h = join(',', grep($_ ne $m1, split(',', $1)), $m2) . $2;
+    } else {
+	$h = $m2;
+	im_warn("no entry for $id, create it.\n");
+    }
+    $History{$id} = $h if ($History{$id} ne $h);
+    return 0;
+}
+
+sub link_history ($$$) {
+    if ($nodbfile) {im_err("no database specified.\n"); return;}
+
+    my ($id, $m1, $m2) = @_;
+    $id =~ s/<(.*)>/$1/;
+
+    my $h;
+    if (defined $History{$id}){
+	$h = $History{$id};
+	$h =~ s/^([^\t]+)(.*)//;
+	$h = join(',', grep($_ ne $m2, split(',', $1)), $m2) . $2;
+    } else {
+	$h = $m1 . ',' . $m2;
+	im_warn("no entry for $id, create it.\n");
+    }
+    $History{$id} = $h if ($History{$id} ne $h);
+    return 0;
+}
+
+sub unlink_history ($$) {
+    if ($nodbfile) {im_err("no database specified.\n"); return;}
+
+    my ($id, $m1) = @_;
+    $id =~ s/<(.*)>/$1/;
+
+    if (defined $History{$id}){
+        my $h = $History{$id};
+	$h =~ s/^([^\t]+)(.*)//;
+	$h = join(',', grep($_ ne $m1, split(',', $1))) . $2;
+	if ($History{$id} =~ /^\t/ || !$m1) {
+	    delete $History{$id};
+	} elsif ($History{$id} ne $h) {
+	    $History{$id} = $h;
+	}
+	return 0;
+    }
+    im_warn("no message id in $m1\n");
+    return -1;
+}
+
+1;

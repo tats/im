@@ -1,0 +1,75 @@
+.TH imget 1 "1997年8月13日"
+
+.SH "名前"
+imget \- メッセージの格納。
+
+.SH "形式"
+.B imget
+[\-\-quiet] [\-\-verbose] [\-\-noscan]
+[\-\-form=format] [\-\-jissafe] [\-\-width=width]
+[\-\-lock=lockstyle] [\-\-keep=type] [\-\-protokeep=type]
+[\-\-src=source]  [\-\-dst=+folder]
+[\-\-mode=mode] [\-\-assoc=list] [\-\-help]
+
+.SH "機能説明"
+指定したソースからメッセージを取得し、
+指定したフォルダに格納する。
+
+.SH "オプション"
+.TP
+.I "\-q, \-\-quiet"
+動作中のメッセージを表示しない。
+
+.TP
+.I "\-v, \-\-verbose"
+
+.TP
+.I "\-n, \-\-noscan"
+メッセージの取得のみを行い、scan のフォームは出力しない。
+
+.TP
+.I "\-f, \-\-form"
+scan 時に出力するフォーマットを指定する。
+
+.TP
+.I "\-j, \-\-jissafe"
+scan の出力に、JIS が含まれていても安全なルーチンを使用する。
+指定しない方が高速に動作するため、
+JIS が含まれることがない環境では、指定しない方が望ましい。
+
+.TP
+.I "\-w, \-\-width"
+scan で出力する文字幅を指定する。
+
+.TP
+.I "\-l, \-\-lock"
+ローカルの mbox からファイルを取得するときに、lock のタイプを指定する。
+指定できるものには none, flock, file の 3つがあり、
+それぞれ lock を行わない、flock() を使用したロックを行う、
+ファイルを使用したロックを行うを意味する。
+デフォルトは flock。
+
+.TP
+.I "\-k, \-\-keep"
+
+.TP
+.I "\-p, \-\-protokeep"
+
+.TP
+.I "\-s, \-\-src"
+
+
+.TP
+.I "\-d, \-\-dst"
+メッセージを格納するフォルダを指定する。
+デフォルトは +inbox。
+
+.TP
+.I "\-m, \-\-mode"
+
+.TP
+.I "\-a, \-\-assoc"
+
+.TP
+.I "\-h, \-\-help"
+ヘルプメッセージの表示。

@@ -1,0 +1,177 @@
+#! @im_path_perl@
+################################################################
+###
+###				  impath
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "impath @im_version@";
+
+$Prog = 'impath';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Folder;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_src $opt_list $opt_path $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+$Prog :: Internet Message Path
+$VERSION
+
+usage: $Prog [options] [folder]
+";
+
+@OptConfig =(
+    'src;F;;'     => "Set source folder.",
+    'list;b;;'    => "Show list of folders.",
+    'path;b;;'    => "Show important paths.",
+    'verbose;b;;' => 'With verbose messages.',
+    'debug;d;;'   => "With debug message.",
+    'help;b;;'    => "Show this message.",
+   );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+my $FOLDER_ROOT;
+
+my $folder = &cur_folder();
+$folder = $opt_src if (defined $opt_src);
+
+if ($opt_path) {
+    show_path();
+    exit $EXIT_SUCCESS;
+}
+
+if ($opt_list) {
+    if ($folder =~ /^([+=])/) {
+	imfolders($folder, $1);
+	exit $EXIT_SUCCESS;
+    } else {
+	im_die("can't get list for $folder\n");
+    }
+}
+
+my @msgs;
+
+foreach (@ARGV) {
+    if (/^[+=]/) {
+	$folder = $_;
+    } else {
+	push(@msgs, $_);
+    }
+}
+
+impath($folder, @msgs);
+
+exit $EXIT_SUCCESS;
+
+##################################################
+##
+## Work horse
+##
+
+##
+## --path
+##
+
+sub show_path () {
+    print "MailPath=" . mail_path() . "\n";
+    print "NewsPath=" . news_path() . "\n";
+    print "InboxFolder=" . inbox_folder() . "\n";
+    print "DraftFolder=" . draft_folder() . "\n";
+    print "TrashFolder=" . trash_folder() . "\n";
+    print "PetnameFile=" . petnamefile() . "\n";
+}
+
+##
+## --list
+##
+
+sub imfolders ($$) {
+    my ($folder, $prefix) = @_;
+    $FOLDER_ROOT = impath_work($folder);
+    $FOLDER_ROOT =~ s:/$::;
+    dig_dir($FOLDER_ROOT, $prefix);
+}
+
+sub dig_dir ($$) {
+    my ($abs_dir, $p) = @_;
+    my @direntries;
+    my ($child, $rel_dir);
+
+    opendir(DIR, $abs_dir);
+    @direntries = sort(grep(-d "$abs_dir/$_" && $_ ne '.' && $_ ne '..',
+                            readdir(DIR)));
+    closedir(DIR);
+
+    foreach (@direntries) {
+        $child = $rel_dir = "$abs_dir/$_";
+        $rel_dir =~ s:$FOLDER_ROOT/*::;
+        print "$p$rel_dir\n";
+        dig_dir($child, $p) if win95p() || os2p() || ((stat($child))[3] > 2);
+    }
+}
+
+###
+### do things like mhpath.
+###
+sub impath ($@) {
+    my $folder = shift;
+    my @msgs   = @_;
+
+    my @paths = impath_work($folder, @msgs);
+
+    die $@ if (scalar(@paths) == 0); # XXX
+
+    foreach (@paths) {
+	print "$_\n";
+    }
+}
+
+sub impath_work ($@) {
+    my $folder = shift;
+    my @msgs  = @_;
+    my @paths;
+
+    im_debug("impath_work: folder: $folder msgs: @msgs\n") if (&debug('all'));
+    @paths = get_message_paths($folder, @msgs);
+    im_debug("impath_work: paths: @paths\n") if (&debug('all'));
+
+    return wantarray ? @paths : $paths[0];
+}
+
+### Local Variables:
+### mode: perl
+### End:

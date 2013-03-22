@@ -1,0 +1,363 @@
+#! @im_path_perl@
+################################################################
+###
+###				 imcat
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: May  5, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "imcat @im_version@";
+
+$Prog = 'imcat';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @EnvConfig @OptConfig
+	    @servers
+	    $opt_src $opt_join $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+imcat :: Display Messages
+$VERSION
+
+Usage: imcat [options] msg
+";
+
+@EnvConfig = (
+    'NNTPSERVERS;s;;' => "Default NNTP servers.",
+     );
+
+@OptConfig = (
+    'src;F;;'     => "Folder.",
+    'join;b;;'    => "join partial messages.",
+    'verbose;b;;' => 'With verbose messages.',
+    'debug;d;;'   => "With debug message.",
+    'help;b;;'    => "Show this message.",
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_env(\@EnvConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+my $msg = $ARGV[0];
+
+unless ($msg) {
+    im_die("no message specified.\n");
+}
+
+if ($msg =~ /^http:/i) {
+    require IM::Http && import IM::Http;
+    my ($rc, $data) = http_process($msg);
+    if ($rc < 0) {
+	im_die("can't access to message $msg.\n");
+    }
+    foreach (@$data) {
+	print;
+    }
+} elsif ($opt_src =~ /^[+=]/) {
+    # Mail/News folder
+    require IM::Folder && import IM::Folder;
+
+#   if ($msg =~ /<.*>/) {
+    if ($msg =~ /\@/) {
+	require IM::History && import IM::History;
+
+	if (open_history(0) < 0) {
+	    im_die("can not open history.\n");
+	    exit $EXIT_ERROR;
+	}
+	my $msg = lookup_history($msg, 'LookUpMsg');
+	close_history();
+	if ($msg eq '') {
+	    im_info("message is not found.\n");
+	    exit $EXIT_ERROR;
+	}
+	&join_msg($msg) if ($opt_join);
+	foreach (split(',', $msg)) {
+	    my $path = &expand_path($_);
+	    if (open(MSG, "<$path")) {
+
+		while (<MSG>) {
+		    print;
+		}
+		close(MSG);
+		exit $EXIT_SUCCESS;
+	    }
+	}
+	im_warn("message $msg is missing.\n");
+	exit $EXIT_ERROR;
+    } else {
+	my $path = &message_name($opt_src, $msg);
+	&join_msg($path) if ($opt_join);
+	if (open(MSG, "<$path")) {
+	    while (<MSG>) {
+		print;
+	    }
+	    close(MSG);
+	} else {
+	    im_warn("no message $msg in folder $opt_src.\n");
+	}
+    }
+} elsif ($opt_src =~ /^\-(.*)/) {
+    # News spool (-group[@server])
+    require IM::Nntp && import IM::Nntp;
+    my $rc;
+
+    my ($group, $srvs) = nntp_spec($1);
+    local @servers = split(',', $srvs);
+    im_notice("accessing to $group on $srvs.\n");
+    do {
+	if (($rc = &nntp_open(\@servers, 0)) < 0) {
+	    im_die("can not connect $srvs.\n");
+	}
+	if (($group ne '') && ($rc = &nntp_command("GROUP $group", 1)) < 0) {
+	    im_die("can not access $group.\n");
+	}
+    } while (@servers > 0 && $rc > 0);
+    im_die("can not access $group on $srvs.\n") if ($rc);
+    ($rc, my $art) = &nntp_article($msg);
+    &nntp_close;
+    if ($rc) {
+	im_die("no message $msg in -$group.\n");
+    }
+    foreach (@$art) {
+	print;
+    }
+} elsif ($opt_src =~ /^(%.*)/) {
+    # IMAP folder (%folder[:[user[/auth]]@server])
+    require IM::Imap && import IM::Imap;
+    require IM::GetPass && import IM::GetPass;
+
+    my ($folder, $auth, $user, $host) = &imap_spec($1);
+
+    my $pass = '';
+    my $agtfound = 0;
+    my $interact = 0;
+    if (&usepwagent()) {
+	$pass = &loadpass('imap', $auth, $host, $user);
+	$agtfound = 1 if ($pass ne '');
+    }
+    if ($pass eq '' && &usepwfiles()) {
+	$pass = &findpass('imap', $auth, $host, $user);
+    }
+    if ($pass eq '') {
+	$pass = &getpass('Password: ');
+	$interact = 1;
+    }
+
+    im_warn("accessing IMAP/$auth:$user\@$host\n") if (&verbose);
+
+    if (&imap_open($auth, $host, $user, $pass) < 0) {
+	im_warn("IMAP connection was not established.\n")
+	  if (&debug('imap') || &verbose);
+	&savepass('imap', $auth, $host, $user, '')
+	    if ($agtfound && &usepwagent());
+	exit $EXIT_ERROR;
+    }
+    &savepass('imap', $auth, $host, $user, $pass)
+	if ($interact && $pass ne '' && &usepwagent());
+    my $msgs = &imap_select($folder, 1);
+    if ($msgs < 0) {
+	&imap_close;
+	im_warn("can't access to $folder\n");
+    } else {
+	my ($rc, $message) = &imap_get($msg);
+	&imap_close;
+	if ($rc < 0) {
+	    im_die("can't access to message $msg in \%$folder.\n");
+	} elsif ($rc > 0) {
+	    im_warn("message $msg not found in \%$folder\n");
+	}
+	foreach (@$message) {
+	    print;
+	}
+    }
+}
+
+exit $EXIT_SUCCESS;
+
+sub join_msg ($) {
+    my $msg = shift;
+    my $path;
+    local $_;
+    require IM::History && import IM::History;
+
+    # get master Message-ID
+    my $header = '';
+    foreach (split(',', $msg)) {
+	if (/^\+/) {
+	    $path = &expand_path($_);
+	} else {
+	    $path = $_;
+	}
+	if (open(MSG, "<$path")) {
+	    $/ = "\n\n";
+	    $header = <MSG>;
+	    $/ = "\n";
+	    close(MSG);
+	    last;
+	}
+    }
+
+    if ($header eq '') {
+	im_err("specified message is not found at $path.\n");
+	exit $EXIT_ERROR;
+    }
+
+    $header =~ s/\n\s+//g;
+    $header =~ s/[ \t]+//g;
+    $header =~ s/\n/;\n/g;
+    $header = "\n$header";
+
+    my $master = '';
+
+    if ($header =~ m|\nContent-Type:Message/partial;(.*;)?id=([^;]+);|i) {
+	$master = $2;
+	$master =~ s/^"(.*)"$/$1/;
+    } else {
+	im_err("specified message is not a partial.\n");
+	exit $EXIT_ERROR;
+    }
+    im_notice("Master Message-ID: $master.\n");
+
+    # get Message-IDs of partial
+    if (open_history(0) < 0) {
+	im_err("can not open history.\n");
+	exit $EXIT_ERROR;
+    }
+    my $ids = lookup_history("partial:$master", 'LookUpMsg');
+    if ($ids eq '') {
+	im_err("information on partial messages is not found in history.\n");
+	exit $EXIT_ERROR;
+    }
+    im_notice("partial Message-IDs: $ids.\n");
+
+    # get path and part number on each part
+    my @paths;
+    my $total = 0;
+    foreach (split(',', $ids)) {
+	my $locate = lookup_history($_, 'LookUpMsg');
+	if ($locate eq '') {
+	    im_warn("message $_ not found, skipping.\n");
+	    next;
+	}
+	my $path = &expand_path($locate);
+	if ($path eq '') {
+	    im_warn("no path for message $locate, skipping.\n");
+	    next;
+	}
+	if (open(MSG, "<$path")) {
+	    $/ = "\n\n";
+	    $header = <MSG>;
+	    $/ = "\n";
+	    close(MSG);
+	}
+
+	$header =~ s/\n\s+//g;
+	$header =~ s/[ \t]+//g;
+	$header =~ s/\n/;\n/g;
+	$header = "\n$header";
+
+	my $number = 0;
+	my $this_total = 0;
+	if ($header =~ /\nContent-Type:Message\/partial(;[^\n]+)\n/i) {
+	    my $rest = $1;
+	    if ($rest =~ /;number=(\d+);/i) {
+		$number = $1;
+	    }
+	    if ($rest =~ /;total=(\d+);/i) {
+		$this_total = $1;
+	    }
+	}
+	if ($number == 0 || $this_total == 0) {
+	    im_warn("$_: not a partial message, skipping.\n");
+	    next;
+	}
+	if ($total) {
+	    if ($total != $this_total) {
+		im_warn("$_: total of partial messages mismatch, skipping.\n");
+		next;
+	    }
+	} else {
+	    $total = $this_total;
+	}
+	$paths[$number] = $path;
+	im_notice("$path is part $number.\n");
+    }
+    close_history();
+
+    # check existance of all partial messages
+    my $missing = 0;
+    my $i;
+    for ($i = 1; $i <= $#paths; $i++) {
+	if ($paths[$i] eq '') {
+	    im_err("part $i is missing.\n");
+	    exit $EXIT_SUCCESS;
+	}
+    }
+
+    # show in sequence
+    for ($i = 1; $i <= $#paths; $i++) {
+	if (open(MSG, "<$paths[$i]")) {
+	    $/ = "\n\n";
+	    if ($i == 1) {
+		my $header = <MSG>;
+		my $skip = 0;
+		foreach (split("\n", $header)) {
+		    next if (/^[ \t]/ && $skip);
+		    $skip = 0;
+		    if (/^(Content|Message-ID)/i) {
+			$skip = 1;
+			next;
+		    }
+		    last if (/^\n/);
+		    print "$_\n";
+		}
+	    } else {
+		# skip header part
+		<MSG>;
+	    }
+	    $/ = "\n";
+	    while (<MSG>) {
+		print;
+	    }
+	    close(MSG);
+	}
+    }
+
+    exit $EXIT_SUCCESS;
+}
+
+
+### Local Variables:
+### mode: perl
+### End:

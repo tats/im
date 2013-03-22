@@ -1,0 +1,107 @@
+#! @im_path_perl@
+################################################################
+###
+###                              imstore
+###
+###        Copyright (C) 1995-1997  Internet Message Group
+###
+###                  This Perl5 library conforms
+###             GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Dec 31, 1995
+### Revised: @im_revised@
+###
+
+my $VERSION = "imstore @im_version@";
+
+$Prog = 'imstore';
+
+use IM::Config;
+use IM::MsgStore;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_dst $opt_verbose $opt_debug $opt_help $opt_noscan);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+$Prog :: Internet Message Store
+$VERSION
+
+Usage :: $Prog [options]
+";
+
+@OptConfig = (
+    'dst;s;+inbox;' => 'Destination folder',
+    'verbose;b;;'   => 'With verbose messages.',
+    'debug;d;;'     => "With debug message.",
+    'help;b;;'      => 'Show this message'
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+$opt_noscan = 1;
+&process_stdin();
+
+sub process_stdin () {
+    my @Message = ();
+
+    while (<STDIN>) {
+	push (@Message, $_);
+    }
+
+    &store_message(\@Message, $opt_dst);
+    &exec_getsbrfile();
+}
+
+__END__
+
+=head1 NAME
+
+imstore - Store a message to a folder
+
+=head1 SYNOPSIS
+
+B<imstore> [B<--dst=+folder>] [B<--help>]
+
+=head1 DESCRIPTION
+
+I<Imstore> get a message from the standard input into an IM folder.
+If `--dst=+folder' isn't specified, +inbox is assumed as the folder.
+The new message being incorporated is assigned the next highest number
+in the folder.
+
+=head1 OPTIONS
+
+=over 5
+
+=item I<-d, --dst = +folder>
+
+Use I<+folder> as a target folder.
+Default is +inbox.
+
+=item I<-h, --help>
+
+Print a usage message on standard output and exit successfully.
+
+=back
+
+=cut
+
+### Local Variables:
+### mode: perl
+### End:

@@ -1,0 +1,85 @@
+################################################################
+###
+###			       Makefile
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: April 23, 1997
+### Revised: @im_revised@
+###
+
+srcdir=	@srcdir@
+INSTALL=@INSTALL@
+SHELL = /bin/sh
+
+chmod=	@im_path_chmod@
+cp=	@im_path_cp@
+mkdir=	@im_path_mkdir@
+rm=	@im_path_rm@
+
+prefix=	@prefix@
+bindir=	@bindir@
+libdir=	@libdir@/im
+mandir=	@mandir@
+exec_prefix=@exec_prefix@
+siteperl=@im_path_siteperl@
+imdir=$(siteperl)/IM
+RPOP=@im_rpop@
+
+all:
+	@echo everything has been done by configure.
+	@echo you only need to do "make install".
+
+install:: installbin installdata
+
+installbin::
+	[ -d $(bindir) ] || \
+		($(mkdir) -p $(bindir) && $(chmod) 755 $(bindir))
+	$(INSTALL) -m 555 imali $(bindir)
+	$(INSTALL) -m 555 imcat $(bindir)
+	$(INSTALL) -m 555 imcd $(bindir)
+	$(INSTALL) -m 555 imgrep $(bindir)
+	$(INSTALL) -m 555 imhist $(bindir)
+	$(INSTALL) -m 555 imls $(bindir)
+	$(INSTALL) -m 555 immv $(bindir)
+	$(INSTALL) -m 555 impack $(bindir)
+	$(INSTALL) -m 555 impath $(bindir)
+	$(INSTALL) -m 555 imput $(bindir)
+	$(INSTALL) -m 555 impwagent $(bindir)
+	$(INSTALL) -m 555 imrm $(bindir)
+	$(INSTALL) -m 555 imsetup $(bindir)
+	$(INSTALL) -m 555 imsort $(bindir)
+	$(INSTALL) -m 555 imstore $(bindir)
+	$(INSTALL) $(RPOP) imget $(bindir)
+
+installdata::
+	[ -d $(imdir) ] || \
+		($(mkdir) -p $(imdir) && $(chmod) 755 $(imdir))
+	$(cp) -r IM/* $(imdir)
+	$(chmod) -R 644 $(imdir)/*
+	$(chmod) 755 $(imdir)
+	[ -d $(libdir) ] || \
+		($(mkdir) -p $(libdir) && $(chmod) 755 $(libdir))
+	for cnf_im in SiteConfig ; do \
+		if test ! -f $(libdir)/$$cnf_im; then \
+			($(cp) cnf.im/$$cnf_im $(libdir)) ; \
+		else \
+			($(cp) cnf.im/$$cnf_im $(libdir)/$$cnf_im.new) ; \
+		fi ;\
+	done
+	$(chmod) -R 644 $(libdir)/*
+	$(chmod) 755 $(libdir)
+
+clean::
+	$(rm) -f imali imcat imcd imrm imget imgrep imhist imls immv \
+		impack impath imput impwagent imsetup imsort imstore
+	$(rm) -rf IM
+	$(mkdir) IM
+
+distclean:: clean
+	$(rm) -f Makefile config.log config.status config.cache

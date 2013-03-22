@@ -1,0 +1,232 @@
+#! @im_path_perl@
+################################################################
+###
+###				imget
+###
+###	   Copyright (C) 1996-1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Jan 14, 1996
+### Revised: @im_revised@
+###
+
+my $VERSION = "imget @im_version@";
+
+$Prog = 'imget';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::MsgStore;
+use IM::Scan;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @EnvConfig @OptConfig
+	    $INSECURE $SUIDROOT
+	    $opt_quiet $opt_noscan $opt_form $opt_jissafe
+	    $opt_width $opt_lock $opt_count $opt_keep $opt_protokeep $opt_src
+	    $opt_dst $opt_mode $opt_assoc $opt_verbose $opt_debug $opt_help
+	    $opt_buffer);
+
+##
+## Environments
+##
+
+my $NNTP_processed;
+
+$EXPLANATION = "
+$Prog :: Internet Message Get
+$VERSION
+
+Usage: $Prog [options]
+
+";
+
+@EnvConfig = (
+    'NNTPSERVERS;s;;' => "Default NNTP servers.",
+    );
+
+@OptConfig = (
+    'quiet;b;;'        => 'No informational messages.',
+    'noscan;b;;'       => 'No scan listings.',
+    'form;s;;'	       => 'Scan format',
+    'jissafe;b;;'      => 'Safe manner for JIS',
+    'width;i;;'        => 'Width of result for scan listings.',
+#   'thread;b;;'       => 'Make threads',
+#   'indent;i;;'       => "Width of thread indent",
+    'lock;s;flock;'    => 'Local mailbox locking style. (none,flock,file)',
+    'rpath;s;append;'  => "conversion of UNIX From line into Return-Path:\n" .
+	"\t\t(append, ignore, replace)",
+    'keep;i;0;'        => "Preserve messages.\n" .
+	"\t\t(POP: in days; 0=delete immediately, -1=preserve forever)\n" .
+	"\t\t(otherwise: 0=delete immediately, non0=preserve forever)",
+    'protokeep;s;UIDL;'=> "Protocol type to use for keeping messages on POP.\n".
+	"\t\t(UIDL, LAST, STATUS, MSGID)\n" .
+	"\t\tTimed out deletion is not supported with LAST.",
+    'usecl;b;;Obey_CL' => "Use value of Content-Length header for delimitation".
+	".\n\t\t(effective only if source of messages is local).\n" ,
+    'count;i;;'        => 'Number of messages to be gotten in a process (NNTP)',
+    'src;s;;' =>
+	"Message source: 'local[:path_of_mbox]'\n" .
+	"\t\t\t\t'pop[/APOP|/RPOP|/POP][:user][\@host]'\n" .
+	"\t\t\t\t'imap[/AUTH|/LOGIN][:user][\@host]'\n" .
+	"\t\t\t\t'nntp:group[\@host]' or\n" .
+	"\t\t\t\t'stdin'" ,
+    'dst;s;+inbox;'    =>
+	'Message destination: "+folder" or "=locally.saved.news".',
+    'mode;s;get;'      => 'Processing mode: "get", "from" or "check".',
+    'assoc;s;;'        => "Association list: dst1=src1;dst2=src2;...\n" .
+	"\t\tThis overrides --dst and --src options.",
+    'verbose;b;;'      => 'With verbose messages.',
+    'debug;d;;'        => "With debug message.",
+    'buffer;B;;'  => 'Make output data buffered',
+    'help;b;;'         => 'Display this help message.',
+    );
+
+##
+## Dropping root privilidge
+##
+
+if (unixp() && $> == 0 && $< != 0) {
+    $SUIDROOT = 1;
+    # if RPOP
+    {
+	require IM::TcpTransaction && import IM::TcpTransaction;
+	pool_priv_sock(3);	# XXX number of sockets to be pooled
+    }
+    im_notice("dropping root privilidge.\n");
+    $> = $<;		# drop root
+    $< = $<;		# be sure not to gain root again
+    $> = 0;		# try to gain root
+    if ($> == 0) {	# oops, gained again
+	$INSECURE = 1;
+	$> = $<;	# drop root
+    }
+    if ($> == 0) {
+	im_die("still having root privilege.\n");
+    }
+}
+
+##
+## Profile and option processing
+##
+
+my $selector = read_cfg_selector(\@ARGV);
+init_opt(\@OptConfig);
+read_env(\@EnvConfig);
+read_cfg();
+set_selector($selector) == 0 or exit 1 if defined($selector);
+my $cnf_src = $opt_src; $opt_src = '';
+my $cnf_dst = $opt_dst; $opt_dst = '';
+my $cnf_assoc = $opt_assoc; $opt_assoc = '';
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+$SIG{'ALRM'} = \&alarm_func;
+
+if ($opt_src eq '' && $opt_dst eq '') {
+    $opt_src = $cnf_src;
+    $opt_dst = $cnf_dst;
+    $opt_assoc = $cnf_assoc if ($opt_assoc eq '');
+} else {
+    $opt_src = $cnf_src if ($opt_src eq '');
+    $opt_dst = $cnf_dst if ($opt_dst eq '');
+}
+
+my $petnamefile = &petnamefile();
+read_petnames($petnamefile) if $petnamefile;
+
+&set_scan_form($opt_form, $opt_width, $opt_jissafe);
+
+my ($assoc, $msgs);
+if ($opt_assoc ne '') {
+    foreach $assoc (split(';', $opt_assoc)) {
+	if ($assoc =~ /(.+)=(.+)/) {
+	    my ($dst, $src) = ($1, $2);
+	    my $m = &get_sub($src, $dst, $opt_mode);
+	    $msgs = $m if ($m > $msgs);
+	} else {
+	    im_warn("invalid parameter for --assoc: $assoc.\n");
+	}
+    }
+} else {
+    $msgs = &get_sub($opt_src, $opt_dst, $opt_mode);
+}
+
+&nntp_close if ($NNTP_processed);
+
+if ($msgs > 0) {
+    exit $EXIT_SUCCESS;
+} else {
+    exit $EXIT_ERROR;
+}
+
+##
+## End of Main
+##
+
+sub get_sub {
+    my ($src, $dst, $mode) = @_;
+    my ($msgs);
+
+    if ($mode ne "get" && $mode ne "check" && $mode ne "from"
+	&& $mode ne "skip") {
+	im_die("unknown mode: $mode\n");
+    }
+    if ($src =~ /^local/i) {
+	require IM::LocalMbox && import IM::LocalMbox;
+	$msgs = &local_get_msg($src, $dst, $mode, $opt_lock);
+    } elsif ($src =~ /^pop/i) {
+	require IM::Pop && import IM::Pop;
+	$msgs = &pop_get_msg($src, $dst, $mode);
+    } elsif ($src =~ /^imap/i) {
+	require IM::Imap && import IM::Imap;
+	$msgs = &imap_get_msg($src, $dst, $mode);
+    } elsif ($src =~ /^nntp/i || $src =~ /^news/i) {
+	require IM::Nntp && import IM::Nntp;
+	$msgs = &nntp_get_msg($src, $dst, $mode, $opt_count);
+        $NNTP_processed = 1;
+    } elsif ($src =~ /^stdin/i) {
+	&process_stdin();
+    } else {
+	im_die("source \"$src\" is not supported.\n");
+	return -1;
+    }
+    return $msgs;
+}
+
+sub process_stdin () {
+    my @Message = ();
+
+    while (<STDIN>) {
+        push (@Message, $_);
+    }
+
+    &store_message(\@Message, $opt_dst);
+    &exec_getsbrfile();
+}
+
+sub alarm_func () {
+#   no operation
+}
+
+### ToDo list
+# code conversion
+# auto refile
+# filter execution
+
+### Local Variables:
+### mode: perl
+### End:

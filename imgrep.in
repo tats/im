@@ -1,0 +1,448 @@
+#! @im_path_perl@
+################################################################
+###
+###		  imgrep :: Internet Message g/RE/p
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "imgrep @im_version@";
+
+$Prog = 'imgrep';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Folder;
+use IM::Stdio;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_format @opt_src $opt_ignorecase $opt_expression
+	    $opt_delimiter $opt_verbose $opt_debug $opt_verbose
+	    $opt_quiet $opt_help);
+
+##
+## Environments
+##
+
+$opt_format = 'number';		# use number, folder, or path
+$opt_ignorecase = 'yes';	# default case-insensitive
+
+my @default_ranges = ();
+my @opt_folders = ();
+
+my $eval_string = '';		# store search engine
+
+# regexp for range syntax (sequence not supported)
+my $range_element = '(\\d+|cur|first|last|next|prev|new)';
+my $range_regexp = "($range_element(-$range_element|:[+-]?\\d+)?|all)";
+
+$EXPLANATION = "
+$Prog :: Internet Message GREP
+$VERSION
+
+Usage :: $Prog [options] [+folder] [range]
+
+";
+
+@OptConfig = (
+    'format;s;;' => 'Output format: "number", "folder", or "path"'.
+	"\n\t\t(default: \"number\" for single target folder".
+	"\n\t\t	     \"path\" for multiple target folders)",
+    'src;F@;;' => 'msg source: "+folder:[range[,range..]]"',
+    'ignorecase;b;on;' => 'Case sensitivity'.
+	"\n\t\t(This option affects both fieldname and pattern.)",
+    'expression;s;;' => 'Search expression:'.
+	"\n\n\t\tUsable keyword".
+        "\n\t\t\t& &&		     logical AND".
+        "\n\t\t\t| ||		     logical OR".
+        "\n\t\t\t!		     logical NOT".
+        "\n\t\t\t( )		     parens".
+        "\n\t\t\tfieldname=pattern	     search pattern for the field".
+        "\n\n\t\tSpecial fieldname:".
+        "\n\t\t\thead	     Entire header".
+        "\n\t\t\tbody	     Entire body".
+        "\n\t\t\tall	     Entire message",
+    'delimiter;s;\n\n|\n----\n;' => 'Mail header delimiter',
+    'verbose;b;;' => 'With diagnostic messages.',
+    'quiet;b;;'   => 'Suppress informational messages.',
+    'debug;d;;'   => 'With debug messages.',
+    'help;b;;'    => 'Show this messages.',
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+my $default_folder = cur_folder(); # must set here
+my $case_flag = '';
+
+#
+# Fix some valuables
+#
+
+$case_flag = 'i' if ($opt_ignorecase);
+
+@opt_src = sortuniq(@opt_src);
+
+@opt_src or @opt_src = ( $default_folder );
+@default_ranges = ( @ARGV ? @ARGV : 'all' );
+
+if ( $opt_format eq 'number' and @opt_src > 1 ) {
+    $opt_format = 'path';
+}
+
+#
+# Compile expression
+#
+
+$eval_string = parse_expression($opt_expression);
+
+#
+# Iterate each folder
+#
+my $matched = 0;
+
+ FOLDER:
+    foreach (@opt_src) {
+	my ($folder, $ranges) = (/([^:]+)(?::)?(.*)?/);
+	my $folder_dir;
+	my @ranges = split(',', $ranges);
+	my @messages = ();
+
+	if ( $folder =~ /^\-/ ) {
+	    im_warn("Newsspool $folder search not supported (ignored)\n");
+	    next FOLDER;
+	}
+
+	@ranges = ( $ranges ? @ranges : @default_ranges );
+
+	im_debug("Going on $folder range @ranges\n") if &debug('all');
+
+	$folder_dir = expand_path($folder);
+
+	chdir($folder_dir) or
+	    im_die("unable to change directory to $folder_dir: $!\n");
+
+	im_debug("entered $folder_dir\n") if &debug('all');
+
+	# collect message numbers
+	foreach ( @ranges ) {
+	    my @tmp = ();
+	    im_die("illegal range specification: $_\n")
+		unless /^$range_regexp$/;
+	    im_debug("extract range $_\n") if &debug('all');
+	    if (( @tmp = message_range($folder, $_)) eq '') {
+		im_warn("message $_ out of range\n");
+	    }
+	    push(@messages, @tmp);
+	}
+
+	im_debug("extracted messages \"@messages\"\n") if &debug('all');
+
+	@messages = sortuniq(@messages);
+
+	im_debug("uniqified messages \"@messages\"\n") if &debug('all');
+
+	my $m;
+      GREP:
+	foreach $m (@messages) {
+	    my ($all, $head, $body) = ('', '', '');
+	    if ( open(MES, "< $m") ){
+		{
+		    local($/);
+		    $all = scalar(<MES>);
+		    ($head, $body) = split($opt_delimiter, $all, 2);
+		}
+		close(MES);
+
+		$head =~ s/\n\s+/ /g; # fix continuation lines
+		$_ = $all;
+		if (eval $eval_string) {
+		    $matched++;
+		    print "$folder:" if ($opt_format eq 'folder');
+		    print "$folder_dir/" if ($opt_format eq 'path');
+		    print "$m\n";
+		    # flush('STDOUT');
+		}
+	    } else {
+		if (! $opt_quiet) {
+		    im_warn("message $m not exists: $!\n");
+		}
+	    }
+	}
+    }
+
+$matched
+    or do {
+	if ($opt_quiet) {
+	    exit $EXIT_ERROR;
+	} else {
+	    im_die2("no message matches specifications\n");
+	}
+    };
+exit $EXIT_SUCCESS;
+
+##
+## End of Main
+##
+##################################################
+
+##################################################
+##
+## Parse expression
+##
+
+sub EOL     { 0; }
+sub LITERAL { 1; }
+sub SYMBOL  { 2; }
+
+sub parse_expression ($) {
+    my ($expr) = shift;
+
+    my $expr_string = '';
+
+    # split into tokens
+    
+    my $STOPCHARS = '(["\']|\\\\(?:.|$)|\s*(?:[!()=]|\&\&?|\|\|?)\s*)';
+    my $SYMBOLS = '[!()=]|\&\&?|\|\|?';
+
+    my @tokens = ();
+    my ($escape, $pos, $len) = (0) x 3;
+    my ($token, $quote) = ('') x 2;
+
+    my $str;
+  LEX:
+    foreach $str (split($STOPCHARS, $expr)) {
+
+	next LEX if ($str eq '');
+
+	# process quoted string
+	if ($quote ne '') {
+	    if ($quote eq $str) {
+		$quote = '';
+		$len++;
+		next LEX;
+	    }
+	    $token .= $str;
+	    $len += length($str);
+	    next LEX;
+	}
+
+	# escaping
+	if ($str eq '\\') {
+	    parse_die('Unexpected end of line', $expr, $pos + 1);
+	}
+	if ($str =~ /\\(.)/) {
+	    $token .= $1;
+	    $len += 2;
+	    next LEX;
+	}
+	
+	# quoting
+	if ($str =~ /^[\'\"]$/) {
+	    $quote = $str;
+	    $len++;
+	    next LEX;
+	}
+
+	if ($str =~ /^\s*($SYMBOLS)\s*$/) {
+	    if ($token ne '') {
+		push(@tokens, [LITERAL, $token, $pos - $len]);
+		$token = '';
+		$len = 0;
+	    }
+	    push(@tokens, [SYMBOL, $1, $pos + index($str, $1)]);
+	    next LEX;
+	}
+
+	$token .= $str;
+	$len += length($str);
+
+    } continue {
+	$pos += length($str);
+    }				# end of LEX:
+
+    # flush remaining literal
+    if ($token ne '') {
+	push(@tokens, [LITERAL, $token, $pos - $len]);
+	$token = '';
+    }
+
+    if ($quote ne '') {
+	parse_die('Quoting not closed', $expr, $pos);
+    }
+
+    push(@tokens, [EOL, '', $pos]); # end of line
+
+    # automaton status:
+    # <empty expression not permitted>
+    #
+    # 0: before expression: '('->0, '!'->0, LITERAL->2, EOL->end
+    # 1: after expression: ')'->0, '|'->0, '&'->0, EOL->end
+    # 2: after field: '='->3, others ->error
+    # 3: before pattern: LITERAL->1, fallback to 1
+    #
+
+    my ($status, $paren) = (0) x 2;
+    my ($field, $pattern, $string) = ('') x 3;
+
+#    my $token;
+  PARSE:
+     foreach $token (@tokens) {
+	
+#	 print "$token->[0]:$token->[1]:$status\n";
+	 
+	 if ($status == 0) {
+	     if ($token->[0] == LITERAL) {
+		 $status = 2;
+		 $field = $token->[1];
+		 next PARSE;
+	     }
+	     if ($token->[0] == EOL) {
+		 last PARSE;
+	     }
+	     if ($token->[1] eq '(') {
+		 $paren++;
+		 $eval_string .= '(';
+		 next PARSE;
+	     }
+	     if ($token->[1] eq '!') {
+		 $eval_string .= 'not ';
+		 next PARSE;
+	     }
+	     parse_die('Unexpected symbol', $expr, $token->[2]);
+	 }
+	 if ($status == 1) {
+	     if ($token->[0] == LITERAL) {
+		 parse_die('Syntax error', $expr, $token->[2]);
+	     }
+	     if ($token->[0] == EOL) {
+		 last PARSE;
+	     }
+	     if ($token->[1] eq ')') {
+		 if (--$paren < 0) {
+		     parse_die('Unbalanced parenthesis', $expr, $token->[2]);
+		 }
+		 $eval_string .= ')';
+		 $status = 1;
+		 next PARSE;
+	     }
+	     if ($token->[1] =~ /&/) {
+		 $eval_string .= 'and ';
+		 $status = 0;
+		 next PARSE;
+	     }
+	     if ($token->[1] =~ /\|/) {
+		 $eval_string .= 'or ';
+		 $status = 0;
+		 next PARSE;
+	     }
+	     parse_die('Unexpected symbol', $expr, $token->[2]);
+	 }
+	 if ($status == 2) {
+	     if ($token->[0] == SYMBOL and $token->[1] eq '=') {
+		 $status = 3;
+		 next PARSE;
+	     }
+	     parse_die('Missing \'=\'', $expr, $token->[2]);
+	 }
+	 if ($status == 3) {
+	     if ($token->[0] == LITERAL) {
+		 $pattern = $token->[1];
+	     }
+	     $field =~ s/([@\/])/\\$1/g;
+	     $pattern =~ s/([@\/])/\\$1/g;
+		 
+	     if ($field =~ /^(all|head|body)$/) {
+		 $string = "\$$field =~ /$pattern/om$case_flag";
+	     } elsif ($field ne '') {
+		 $string = "\$head =~ /^$field:.*$pattern/om$case_flag";
+	     } else {
+		 parse_die('Search pattern not specified', $expr, $token->[2]);
+	     }
+
+	     $status = 1;
+	     $eval_string .= "$string ";
+	     $field = '';
+	     $pattern = '';
+	     $string = '';
+	     
+	     if ($token->[0] == LITERAL) {
+		 next PARSE;
+	     }
+	     redo PARSE;
+	 }
+     }				# end of PARSE:
+
+    if ($paren > 0) {
+        parse_die('Parenthesis not closed', $expr, length($expr));
+    }
+    
+# simple check by perl interpreter
+    my ($head, $body, $all) = ('') x 3;
+    eval "$eval_string";
+    if ($@) {
+	if ($opt_quiet) {
+	    exit $EXIT_ERROR;
+	}
+	if ($opt_verbose) {
+	    im_die("something wrong with the expression:\n$@");
+	}
+	im_die("something wrong with the expression\n");
+    }
+    
+#    print "$eval_string\n"; exit 0;
+    return $eval_string;
+}    
+
+sub parse_die($$$) {
+    my ($die, $expr, $pos) = @_;
+    if (!$opt_quiet and !$opt_verbose) {
+	im_die("$die in the expression\n");
+    }
+    if (!$opt_quiet and $opt_verbose) {
+	im_die("$die\n$expr\n" . (" " x $pos) . "^\n");
+    }
+    exit $EXIT_ERROR;
+}
+    
+
+##################################################
+##
+## sort and uniqify a list
+##
+
+sub sortuniq (@) {
+    my(@target) = @_;
+    my(%tmp);
+
+    @tmp{@target} = (undef) x @target;
+    return ( sort {$a <=> $b} keys %tmp );
+}
+
+### Local Variables:
+### mode: perl
+### End:

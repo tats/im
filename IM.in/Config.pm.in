@@ -1,0 +1,1054 @@
+# -*-Perl-*-
+################################################################
+###
+###			      Config.pm
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $PM_VERSION = "IM::Config.pm @im_version@";
+
+package IM::Config;
+require 5.003;
+require Exporter;
+
+use integer;
+use strict 'vars';
+use strict 'subs';
+use vars qw(@ISA @EXPORT
+	    $SUCCESS $ERROR $EXIT_SUCCESS $EXIT_ERROR);
+
+@ISA = qw(Exporter);
+@EXPORT = qw(
+    $ERROR $SUCCESS $EXIT_SUCCESS $EXIT_ERROR
+    unixp win95p wntp os2p
+    read_cfg_selector
+    init_opt
+    read_env read_cfg read_opt
+    set_selector used_selectors
+    sanity_check
+    help
+    progname
+    home_dir conf_dir mail_dir mail_path news_dir news_path
+    inbox_folder draft_folder trash_folder
+    preserve_dot
+    folder_mode msg_mode allowcrlf
+    aliases_file context_file
+    address addresses_regex
+    msgdbfile msgdbtype getsbrfile scansbrfile petnamefile
+    mbox_style
+    nntpservers nntphistoryfile
+    popaccount pophistoryfile imapaccount httpproxy noproxy
+    usepwagent pwagentport usepwfiles pwfiles
+    expand_path login_name
+    im_msg im_info im_debug im_notice im_warn im_err im_die im_die2
+    im_save_error im_saved_errors
+    debug_option set_debug debug set_verbose verbose
+);
+
+##
+## Constant
+##
+use vars qw($CURRENT_DIR $HOME_DIR $IM_SYS_DIR
+	    $IM_USER_DIR $IM_SYS_PROFILE $IM_USER_PROFILE
+	    $OS @CfgConfig
+	    @O_IORD %O_DESC %O_VNAM %O_FULL %O_ABBR %O_HELP
+	    $O_FOPT %C_DESC %C_VNAM
+	    %WHO_SET
+	    @SELECTORS $SavedMsg %Debug);
+
+$CURRENT_DIR = $ENV{'PWD'} || eval { use Cwd; fastcwd(); } ||
+    im_die("can't get your current directory\n");
+
+$HOME_DIR = $ENV{'HOME'} || $ENV{'LOGDIR'} || (getpwuid($<))[7] ||
+    im_die("can't get your home directory\n");
+$HOME_DIR =~ s:\\:/:g;     # "\home\user" -> "/home/user"
+$HOME_DIR =~ s/\/$//;      # "/home/" -> "/home"
+
+$IM_SYS_DIR = $ENV{'IM_SYS_DIR'};
+unless ($IM_SYS_DIR) {
+    my $exec_prefix= "@prefix@";
+    $IM_SYS_DIR = "@libdir@/im";
+}
+
+$IM_USER_DIR = expand_home($ENV{'IM_USER_DIR'} || '.im');
+
+$IM_SYS_PROFILE = "$IM_SYS_DIR/SiteConfig";
+$IM_USER_PROFILE = "$IM_USER_DIR/Config";
+
+$SUCCESS = 1;
+$ERROR = 0;
+
+$EXIT_SUCCESS = 0;
+$EXIT_ERROR = 1;
+
+##
+
+my $osname = $^O;
+
+if ($osname =~ /win/i) {
+    if (Win32::IsWinNT()) {
+	$OS = 'WNT';
+    } elsif (Win32::IsWin95()) {
+	$OS = 'WIN95';
+    } else {
+	$OS = 'WIN95';		# xxx
+    }
+} elsif ($osname =~ /os2/i) {
+    $OS = 'OS/2';
+} else {
+    $OS = 'UNIX';
+}
+
+sub unixp {
+    if ($OS eq 'UNIX') {
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+sub win95p {
+    if (($OS eq 'WIN95') || ($OS eq 'WNT') ){
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+sub wntp {
+    if ($OS eq 'WNT') {
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+sub os2p {
+    if ($OS eq 'OS/2') {
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+##
+##
+##
+BEGIN {
+
+@CfgConfig = (
+    'maildir;s;;MailDir'	=> 'A directory to contain mail messages',
+    'newsdir;s;;NewsDir'	=> 'A directory to contain news messages',
+    'inboxfolder;f;;InboxFolder'	=> 'Inbox folder',
+    'draftfolder;f;;DraftFolder'	=> 'Draft folder',
+    'trashfolder;f;;TrashFolder'	=> 'Trash folder',
+    'foldermode;i;;FolderMode'		=> 'Folder directory mode when created',
+    'msgmode;i;;MsgMode'		=> 'Message file mode when created',
+    'allowcrlf;b;;AllowCRLF'		=> 'CRLF may be in saved message',
+    'preservedot;b;;PreserveDot'	=> 'Not substitute "." with "/"',
+    'contextfile;s;Context;ContextFile'	=> 'Context file',
+    'address;s;;Address'		=> 'Email addresses',
+    'addrregex;s;;AddrRegex'		=> 'Email addresses by regex',
+    'msgdbfile;s;;MsgDBFile'		=> 'Message database location',
+    'msgdbtype;s;;MsgDBType'		=> 'Message database type',
+    'petnamefile;s;;PetNameFile'	=> 'PetName file',
+    'getsbr;s;;GetSbrFile'		=> 'Get hook subroutine script',
+    'scansbr;s;;ScanSbrFile'		=> 'Scan hook subroutine script',
+    'mboxstyle;s;;MBoxStyle'		=> 'Style of local MBox format',
+    'nntpservers;s;;NNTPservers'	=> 'List of NNTP servers',
+    'nntphistory;s;;NNTPhistory'	=> 'Status file of NNTP access',
+    'popaccount;s;;POPaccount'		=> 'Account info for POP access',
+    'pophistory;s;;POPhistory'		=> 'Status file of POP access',
+    'imapaccount;s;;IMAPaccount'	=> 'Account info for IMAP access',
+    'httpproxy;s;;HTTPproxy'		=> 'Proxy server for HTTP access',
+    'noproxy;s;;Noproxy'		=> 'URL regex not to use Proxy server',
+    'usepwagent;b;;UsePwAgent'		=> 'Use password agent',
+    'pwagentport;i;;PwAgentPort'	=> 'Port to connect agent with TCP/IP',
+    'usepwfiles;b;;UsePwFiles'		=> 'Use password files',
+    'pwfiles;s;;PwFiles'		=> 'Password files',
+    );
+
+    # these vars should be in current package?
+    my (@vars) = ();
+    my ($i, $name, $desc, $dflt, $vnam);
+    for ($i = 0; $i < $#CfgConfig; $i+=2) {
+	($name, $desc, $dflt, $vnam) = split(';', $CfgConfig[$i]);
+	if ($vnam) {
+	    push(@vars, '$' . $vnam);
+        }
+    }
+    # print "use vars qw(@vars);\n";
+    eval "use vars qw(@vars);";
+}
+
+##
+##
+##
+
+sub read_cfg_selector ($) {
+    my $argvref = shift;
+    my $i = 0;
+    my $selector = '';
+
+    foreach $a (@$argvref) {
+	if ($a =~ /^--config=(.*)$/i) {
+	    $selector = $1;
+## side effect!
+## --config=value is removed from @ARGV
+	    splice(@$argvref, $i, 1);
+	}
+	$i++;
+    }
+    return $selector;
+}
+
+sub init_opt ($;$)
+{
+    my ($optref, $cptref) = @_;
+    my ($name, $desc, $dflt, $vnam, $abbr, $optn, $help);
+    my ($i, $N);
+
+    @O_IORD = (); ## option list in order
+    %O_DESC = (); # --help -> s|s@|i|i@|f|f@|F|F@|b|B
+    %O_VNAM = (); # --help -> help
+    %O_FULL = (); # -h -> --help
+    %O_ABBR = (); # --help -> -h
+    %O_HELP = (); # --help -> "help message"
+
+    # $O_FOPT;    # --src or --dst for help
+
+    %C_DESC = (); # address -> s|s@|i|f|f@|b|B
+    %C_VNAM = (); # address -> Address
+
+    # set @CfgConfig
+    $i = 0;
+    $N = scalar(@CfgConfig);
+    while ($i < $N) {
+	($name, $desc, $dflt, $vnam) = split(';', $CfgConfig[$i]);
+	$i += 2;
+	if ($desc =~ /^(s|s@|i|i@|f|f@|F|F@|b|B)$/) {
+	    $optn = $name;
+	    if ($vnam) {
+		# no main:: !
+		$C_VNAM{$optn} = $vnam;
+	    } else {
+		$C_VNAM{$optn} = "main::opt_\L$name";
+	    }
+	    $C_DESC{$optn} = $desc;
+	    ${$C_VNAM{$optn}} = $dflt if $dflt;
+	} else {
+	    im_warn("invalid opt desc ``$desc'' for $optn\n");
+	    return undef;
+	}
+    }
+
+    # set @OptConfig
+    $i = 0;
+    $N = scalar(@$optref);
+    while ($i < $N) {
+	($name, $desc, $dflt, $vnam) = split(';', $$optref[$i]);
+	$i++;
+	$help = $$optref[$i];
+	$i++;
+	if ($desc =~ /^(s|s@|i|i@|f|f@|F|F@|b|B|d)$/){
+	    $optn = lc("--$name");
+	    push(@O_IORD, $optn);
+	    if ($vnam) {
+		$O_VNAM{$optn} = "main::$vnam";
+	    } else {
+		$O_VNAM{$optn} = "main::opt_\L$name";
+	    }
+	    ${$O_VNAM{$optn}} = $dflt if $dflt;
+	    $O_DESC{$optn} = $desc;
+	    $O_HELP{$optn} = $help;
+	    unless ($cptref || $desc eq 'd') {
+		# no @CptConfig, so set abbrev
+		$abbr = substr($optn, 1, 2);  # -h
+		$O_FULL{$abbr} = $optn;
+		$O_ABBR{$optn} = $abbr;
+	    }
+	    $O_FOPT = $optn if $desc =~ /^F/;
+	} else {
+	    im_warn("invalid opt desc ``$desc'' for $optn\n\n");
+	    return undef;
+	}
+    }
+    # set @CptConfig
+    if ($cptref) {
+	$i = 0;
+	$N = scalar(@$cptref);
+	while ($i < $N) {
+	    ($name, $desc, $dflt, $vnam) = split(';', $cptref->[$i]);
+    	    $i++;
+	    $help = $cptref->[$i];
+	    $i++;
+	    if ($desc =~ /^(s|s@|i|i@|f|f@|F|F@|b|B)$/){
+	        $optn = "-$name"; ## no lc()
+		push(@O_IORD, $optn);
+	        if ($vnam) {
+		    $O_VNAM{$optn} = "main::$vnam";
+	        } else {
+		    $O_VNAM{$optn} = "main::opt_\L$name";
+	        }
+		# $dflt should be "off" if /b/ and "on" if /B/ usually
+		# but no such limitations here to allow -opt and -noopt pair.
+		${$O_VNAM{$optn}} = $dflt if $dflt;
+	        $O_DESC{$optn} = $desc;
+	        $O_HELP{$optn} = $help;
+	    } else {
+	        im_warn("invalid opt desc ``$desc'' for $optn\n\n");
+	        return undef;
+	    }
+	}
+    }
+
+    return 1;
+}
+
+sub read_env ($) {
+    my $envref = shift;
+    my ($i, $N) = (0, scalar(@$envref));
+    my ($name, $desc, $dflt, $var);
+
+    while ($i < $N) {
+	($name, $desc, $dflt, $var) =  split(';', $envref->[$i]);
+	if ($ENV{$name}) {
+	    set_value($desc, $var, $ENV{$name}, 'env');
+	} elsif ($dflt) {  # not else !
+	    set_value($desc, $var, $dflt, 'env');
+	}
+	$i++;
+    }
+}
+
+sub read_cfg () {
+    my ($profile, @profiles);
+    my $prev_line = '';
+    my $case;
+
+    @profiles = ('<DATA>', $IM_SYS_PROFILE, $IM_USER_PROFILE);
+
+    foreach $profile (@profiles) {
+	my $fh;
+	if ($profile eq '<DATA>') {
+	    $fh = \*DATA;
+	}
+	elsif (open(PROFILE, "<$profile")) {
+	    $fh = \*PROFILE;
+	}
+	else {
+	    next;
+	}
+
+	# start with 'default'
+	$case = 'default';
+	while (<$fh>) {
+	    last if /^__END__/;	# for sake of SelfLoader
+	    next if /^#/;
+	    chomp;
+	    # continuous line processing (\ at EOL style)
+	    if ($prev_line ne '') {
+		s/^\s*//;
+		$_ = $prev_line . $_;
+		$prev_line = '';
+	    }
+	    if (/\\$/) {
+		chop;
+		$prev_line = $_;
+		next;
+	    }
+	    # Src=inbox<space>#<any>
+	    s/\s#.*$//;
+	    s/\s*$//;
+	    if (/^case\s*(.*)/) {
+		($case = $1) =~ s/\s*//g;
+		# make sure defined(%{$case}) is true
+		foreach (split(',', $case)) {
+		    $_->{0} = '';
+		    delete $_->{0};
+		}
+		next;
+	    }
+	    if (/^(\*|[\w]+)\.(\w+)[:=]\s*(.+)$/) {
+		# Imls.Src=+inbox
+		if ((lc($1) eq progname()) || ($1 eq '*')) {
+		    set_value_cfg($2, $3, $case);
+		}
+		next;
+	    }
+	    if (/^(\w+)[:=]\s*(.+)$/) {
+		# Src = +inbox
+    		set_value_cfg($1, $2, $case);
+		next;
+	    }
+	}
+	if ($profile ne '<DATA>') {
+	    # don't close DATA, and we broke on __END__ for SelfLoader
+	    close (PROFILE);
+	    if ($prev_line ne '') {
+		im_die("Unexpected EOF at the bottom of config file.\n");
+	    }
+	}
+    }
+}
+
+sub read_opt ($) {
+    my $argref = shift;
+    my ($ref, $i, $N) = (0, 0, scalar(@$argref));
+    my ($name, $val, $desc, $vnam);
+
+    # delete options from @ARGV so that main{} can treat
+    # @ARGV as argments.
+
+    while ($i < $N) {
+	$_ = $argref->[$ref];
+	$i++;
+	if (/^(--\w+)=(.*)/) {
+	    $name = lc($1);
+	    $val = $2;
+	    $desc = $O_DESC{$name} || im_die("unknown option $name\n");
+	    $vnam = $O_VNAM{$name};
+	    splice(@$argref, $ref, 1);
+	    set_value($desc, $vnam, $val, 'opt');
+	} elsif (/^(--\w+)$/) {
+	    $name = lc($1);
+	    $desc = $O_DESC{$name} || im_die("unknown option $name\n");
+	    $vnam = $O_VNAM{$name};
+	    if ($desc =~ /s/) {
+		$val = '';
+	    } elsif ($desc =~ /i/) {
+		$val = 0;
+#	    } elsif ($desc =~ /f/) { # xxx
+#		$val = '+inbox';
+	    } elsif ($desc =~ /b/) {
+		$val = 'on';
+	    } elsif ($desc =~ /B/) {
+		$val = 'off';
+	    } elsif ($desc =~ /d/) { # for debug option
+		$val = 'all';
+	    }
+	    set_value($desc, $vnam, $val, 'opt');
+	    splice(@$argref, $ref, 1);
+	} elsif (/^(-\w+)$/) {
+	    $name = $1;
+	    $name = $O_FULL{$name} if $O_FULL{$name};
+	    $desc = $O_DESC{$name} || im_die("unknown option $name\n");
+	    $vnam = $O_VNAM{$name};
+	    if ($desc =~ /[sifF]/) { # bB never take the next argment
+		$val = $argref->[$ref + 1];
+		$i++;
+		splice(@$argref, $ref, 2);
+	    } elsif ($desc =~ /b/) {
+		$val = 'on';
+		splice(@$argref, $ref, 1);
+	    } elsif ($desc =~ /B/) {
+		$val = 'off';
+		splice(@$argref, $ref, 1);
+	    }
+	    set_value($desc, $vnam, $val, 'opt');
+	} elsif (/^[+\-=%.\/~]/ && $O_FOPT) {
+	    $name = $O_FOPT;
+	    $val = $_;
+	    $desc = $O_DESC{$name} || im_die("unknown option $name\n"); # must be F or F@
+	    $vnam = $O_VNAM{$name};
+	    splice(@$argref, $ref, 1);
+	    set_value($desc, $vnam, $val, 'opt');
+	} else {
+	    # else may be an argment, so let it be...
+	    $ref++;
+	}
+    }
+}
+
+sub set_selector ($) {
+    my $selector = shift;
+    my $s;
+
+    foreach $s (split(',', lc($selector))) {
+	next if ($s eq 'default');
+	unless (defined(%{$s})) {
+	    im_err("no 'case $s' in config file.\n");
+	    return -1;
+	} else {
+	    push(@SELECTORS, $s);
+	    foreach (keys(%{$s})){
+		${$_} = $s->{$_};
+	    }
+	}
+    }
+    return 0;
+}
+
+sub used_selectors () {
+    return join(',', @SELECTORS);
+}
+
+sub sanity_check () {
+    unless ($MailDir) {
+	im_die("config files\n" .
+	       "Please setup user profile \"$IM_USER_PROFILE\".\n" .
+	       "MailDir is required.");
+    }
+}
+
+sub help ($)
+{
+    my $explanation = shift;
+    my ($name, $spec, $desc, $abbr, $dflt);
+
+    print "${explanation}\nOptions are: \n";
+
+    foreach $name (@O_IORD){
+	next unless (defined($O_HELP{$name}));
+
+	$desc = $O_DESC{$name};
+	if ($O_ABBR{$name}) {
+	    $abbr = "($O_ABBR{$name})";
+	} else {
+	    $abbr = '';
+	}
+	if ($desc =~ /^[sifF]\@$/) {
+	    $dflt = join(',', @{$O_VNAM{$name}});
+	} else {
+  	    $dflt = ${$O_VNAM{$name}};
+	}
+
+	$spec = '';
+
+	$spec = '<string>'         if $desc =~ /^s/;
+	$spec = '<num>'            if $desc =~ /^i/;
+	$spec = '<folder>'         if $desc =~ /^[fF]/;
+	$spec = '<on|off>'         if $desc =~ /^[bB]/;
+	$spec = "$spec,$spec..."   if ($desc =~ /^[sifF]\@$/) && $spec;
+	$spec = '<debug option>'   if $desc =~ /^d/;
+	$spec = "=$spec"           if $spec;
+
+	if ($desc =~ /[bB]/) {
+	    if ($dflt && $dflt =~ /^on|yes|true|1$/) {
+		$dflt = 'on';
+	    } else {
+		$dflt = 'off';
+	    }
+	}
+
+	print "\t$name$spec $abbr($dflt)\n";
+	print "\t\t", $O_HELP{$name}, "\n";
+    }
+    print "\n* Note that +xxx is equivalent to $O_FOPT=+xxx\n\n" if $O_FOPT;
+    return 1;
+}
+
+##
+##
+##
+
+sub set_value_cfg ($$$)
+{
+    my ($name, $val, $case) = @_;
+    my ($mnam, $desc, $vnam);
+
+    $val =~ s/\${(\w+)}/$ENV{$1}/ge;
+    if ($val =~ /^\$(.*)/) {
+	# $InboxFolder -> +inbox
+	$val = ${$C_VNAM{lc($1)}};
+    } elsif ($val =~ /^~(.*)/) {
+	# ~/.im/Config -> $HOME_DIR/.im/Config
+	$val = "$HOME_DIR$1";
+    }
+
+    $name = lc($name);
+    $mnam = "--$name";
+    if ($O_VNAM{$mnam}) {
+	# $main::opt_help
+	$desc = $O_DESC{$mnam};
+	$vnam = $O_VNAM{$mnam};
+    } elsif ($C_VNAM{$name}) {
+	# $MailDir
+	$desc = $C_DESC{$name};
+	$vnam = $C_VNAM{$name};
+    }
+    if ($vnam && $desc) {
+	if ($case eq 'default') {
+		set_value($desc, $vnam, $val, 'cfg');
+	} else {
+	    foreach (split(',', $case)) {
+		set_value_case($desc, $vnam, $val, $_);
+	    }
+	}
+    }
+}
+
+# set_value is not in safe manner.
+# see if $desc exists before calling this.
+
+sub set_value ($$$$)
+{
+    my ($desc, $vnam, $val, $who) = @_;  # b, $main::opt_help, yes
+
+    # require numeric but not numeric, return undef
+    return undef if ($desc =~ /i/ && $val !~ /\d+/);
+
+    if ($desc =~ /\@/) {
+	# --xxx=foo,bar --xxx=baz
+	# -> @xxx = (foo, bar, gaz)
+	my @val = split(',', $val);
+	if ($desc =~ /F/) { # xxx how about f
+	    my ($i, $N) = (0, scalar(@val));
+	    while ($i < $N) {
+		$val[$i] = "+$val[$i]" unless $val =~ /^[+\-=%~]/;
+		$i++;
+	    }
+	}
+	if (($who eq 'env') || ($who eq 'cfg')) {
+	    # override it
+	    @{$vnam} = @val;
+	} elsif ($WHO_SET{$vnam} eq 'opt') {
+	    # set by 'opt', so just append.
+	    push(@{$vnam}, @val);
+	} else {
+	    # set by 'env' or 'cfg' but I'm 'opt', so override it
+	    @{$vnam} = @val;
+	}
+	$WHO_SET{$vnam} = $who;
+	im_debug("\@$vnam = @{$vnam}\n") if &debug('config');
+    } else {
+	if ($desc =~ /[bB]/) {
+	    # the difference between 'b' and 'B' appears only when
+	    # value is omitted or "-opt" specified. In that case,
+	    # 'b' becames 1 while 'B' becames 0.
+	    # 'B' never means negate boolean. True is always '1'.
+	    if ($val =~ /^yes|on|true|1$/i) {
+		${$vnam} = 1;
+	    } else {
+		${$vnam} = 0;
+	    }
+	} elsif ($desc =~ /F/) {  # xxx how about f
+	    # +inbox -> + inbox -> --src +inbox
+	    if ($val =~ /^[+\-=%~]/) {
+		${$vnam} = $val;
+	    } else {
+		${$vnam} = "+$val";
+	    }
+	} else {
+	    ${$vnam} = $val;
+	}
+	im_debug("\$$vnam = ", ${$vnam}, "\n") if &debug('config');
+    }
+
+    return 1;
+}
+
+sub set_value_case ($$$$)
+{
+    my ($desc, $vnam, $val, $case) = @_;  # b, $main::opt_help, yes
+
+    # require numeric but not numeric, return undef
+    return undef if ($desc =~ /i/ && $val !~ /\d+/);
+    $case = lc($case);
+
+    if ($desc =~ /[bB]/) {
+	if ($val =~ /^yes|on|true|1$/i) {
+	    $case->{$vnam} = 1;
+	} else {
+	    $case->{$vnam} = 0;
+	}
+    } elsif ($desc =~ /F/) {  # xxx how about f
+	# +inbox -> + inbox -> --src +inbox
+	if ($val =~ /^[+\-=%]/) {
+	    $case->{$vnam} = $val;
+	} else {
+	    $case->{$vnam} = "+$val";
+	}
+    } else {
+	$case->{$vnam} = $val;
+    }
+
+    return 1;
+}
+
+###
+### Config vs Default
+###
+
+sub progname () {
+    return $main::Prog;
+}
+
+sub current_dir () {
+    return $CURRENT_DIR;
+}
+
+sub home_dir () {
+    return $HOME_DIR;
+}
+
+sub conf_dir () {
+    return $IM_USER_DIR;
+}
+
+sub mail_dir () {
+    return $MailDir;
+}
+
+sub mail_path () {
+    return expand_home(mail_dir());
+}
+
+sub news_dir () {
+    return $NewsDir;
+}
+
+sub news_path () {
+    return expand_home(news_dir());
+}
+
+sub inbox_folder () {
+    return $InboxFolder;
+}
+
+sub draft_folder () {
+    return $DraftFolder;
+}
+
+sub trash_folder () {
+    return $TrashFolder;
+}
+
+sub preserve_dot () {
+    return $PreserveDot;
+}
+
+sub folder_mode ($) {
+    my $setumask = shift;
+
+    $FolderMode = oct($FolderMode) if ($FolderMode =~ /^0\d/);
+    my $umask = 0777 ^ $FolderMode;
+    umask($umask) if ($setumask);
+    return $FolderMode;
+}
+
+sub msg_mode ($) {
+    my $setumask = shift;
+
+    $MsgMode = oct($MsgMode) if ($MsgMode =~ /^0\d/);
+    my $umask = 0777 ^ $MsgMode;
+    umask($umask) if ($setumask);
+    return $MsgMode;
+}
+
+sub allowcrlf () {
+    return $AllowCRLF;
+}
+
+sub context_file () {
+    return &expand_path($ContextFile);
+}
+
+sub address () {
+    return $Address;
+}
+
+sub addresses_regex () {
+    return $AddrRegex;
+}
+
+sub msgdbfile () {
+    return &expand_path($MsgDBFile);
+}
+
+sub msgdbtype () {
+    return $MsgDBType;
+}
+
+sub petnamefile () {
+    return &expand_path($PetNameFile);
+}
+
+sub getsbrfile () {
+    return &expand_path($GetSbrFile);
+}
+
+sub scansbrfile () {
+    return &expand_path($ScanSbrFile);
+}
+
+sub mbox_style () {
+    return $MBoxStyle;
+}
+
+sub nntpservers () {
+    return $NNTPservers;
+}
+
+sub nntphistoryfile () {
+    return &expand_path($NNTPhistory);
+}
+
+sub popaccount () {
+    return $POPaccount;
+}
+
+sub pophistoryfile () {
+    return &expand_path($POPhistory);
+}
+
+sub imapaccount () {
+    return $IMAPaccount;
+}
+
+sub httpproxy () {
+    return $HTTPproxy;
+}
+
+sub noproxy () {
+    return $Noproxy;
+}
+
+sub usepwagent () {
+    return $UsePwAgent;
+}
+
+sub pwagentport () {
+    return $PwAgentPort;
+}
+
+sub usepwfiles () {
+    return $UsePwFiles;
+}
+
+sub pwfiles () {
+    return $PwFiles;
+}
+
+###
+### path expansion
+###
+
+sub expand_home ($) {
+    my $folder = shift;
+
+    return '' if ($folder eq '');
+    if ($folder =~ /^\//) {
+	# nothing
+    } elsif ($folder =~ /^[a-zA-Z]:\//) {
+	# nothing
+    } elsif ($folder =~ /^\~\/(.*)/) {
+	$folder = home_dir() . '/' . $1;
+    } else {
+	$folder = home_dir() . '/' . $folder;
+    }
+    return $folder;
+}
+
+sub expand_path ($) {
+    my $folder = shift;
+
+    return '' unless $folder;
+    if ($folder =~ /^\//) {
+	# nothing
+    } elsif ($folder eq '.') {
+	$folder = current_dir();
+    } elsif ($folder eq '..') {
+	$folder = current_dir() . '/..';
+    } elsif ($folder =~ /^\.\//) {
+	$folder = current_dir() . '/' . $folder;
+    } elsif ($folder =~ /^-/) {
+	$folder = '';
+    } elsif ($folder =~ /^\%/) {
+	$folder = '';
+    } elsif ($folder =~ /^\+(.*)/) {
+	$folder = mail_path() . '/' . $1;
+    } elsif ($folder =~ /^=(.*)/) {
+	$folder = $1;
+	$folder =~ s/\./\//g unless preserve_dot();
+	$folder = news_path() . '/' . $folder;
+    } elsif ($folder =~ /^[a-zA-Z]:\//) {
+	# nothing
+    } elsif ($folder =~ /^\~\/(.*)/) {
+	$folder = home_dir() . '/' . $1;
+    } else {
+	$folder = conf_dir() . '/' . $folder;
+    }
+    return $folder;
+}
+
+###
+### get login name
+###
+sub login_name () {
+    if (&unixp()) {
+	return getlogin() || (getpwuid($<))[0];
+    } elsif (&os2p()){
+	return getlogin();
+    } elsif (&win95p()){
+	return Win32::LoginName();
+    }
+}
+
+###
+### message
+###
+
+sub im_msg ($) {
+    my $msg = shift;
+    print progname(), ': ', $msg;
+}
+
+sub im_info ($) {
+    my $info = shift;
+    return if $main::opt_quiet;
+    print progname(), ': ', $info;
+}
+
+sub im_debug ($) {
+    my $dbg = shift;
+    print STDERR progname(), ':DEBUG: ', $dbg;
+}
+
+sub im_notice ($) {
+    return unless &verbose;
+    my $warn = progname() . ': '. shift;
+    $SavedMsg .= $warn;
+    print STDERR $warn;
+}
+
+sub im_warn ($) {
+    my $warn = progname() . ': '. shift;
+    $SavedMsg .= $warn;
+    print STDERR $warn;
+}
+
+sub im_err ($) {
+    my $err = progname() . ': ERROR: ' . shift;
+    $SavedMsg .= $err;
+    print STDERR $err;
+}
+
+sub im_die ($) {
+    my $die = shift;
+    print STDERR progname(), ': ERROR: ', $die;
+    exit $EXIT_ERROR;
+}
+
+sub im_die2 ($) {
+    my $die = shift;
+    print STDERR progname(), ': ', $die;
+    exit $EXIT_ERROR;
+}
+
+sub im_save_error (;$) {
+    my $string = shift;
+    if ($string eq '') {
+	$SavedMsg = '';	# reset
+    } else {
+	$SavedMsg .= $string;
+    }
+}
+
+sub im_saved_errors () {
+    return $SavedMsg;
+}
+
+###
+### Debug
+###
+
+sub print_hash (\%)
+{
+    my $hashref = shift;
+
+    foreach (keys(%{$hashref})){
+	print "$_ -> $hashref->{$_}\n";
+    }
+}
+
+sub set_debug ($$) {
+    my $category = shift;
+
+    $Debug{$category} = shift;
+}
+
+sub debug ($) {
+    my $category = shift;
+
+    if ($Debug{'all'}) {
+	return $Debug{'all'};
+    } else {
+	return $Debug{$category};
+    }
+}
+
+sub set_verbose ($) {
+    $main::opt_verbose = shift;
+}
+
+sub verbose () {
+    return $main::opt_verbose;
+}
+
+##### SET DEBUG OPTION #####
+#
+# debug_option()
+#
+sub debug_option ($) {
+    my $DebugFlag = shift;
+
+    if ($DebugFlag) {
+	foreach (split(',', $DebugFlag)) {
+	    im_warn("setting debug level $_=1\n");
+	    &set_debug($_, 1);
+	}
+	&set_verbose(1);
+    }
+}
+
+1;
+__DATA__
+##
+## Default global parameters
+##
+MailDir=Mail			# relative to ~/
+NewsDir=News			# relative to ~/
+# folders for mail messages
+InboxFolder=+inbox		# default destination of imget
+DraftFolder=+draft
+TrashFolder=+trash		# default destination of message removal in mew
+# mode for creation
+FolderMode=0700
+MsgMode=0600
+# to keep state of IM commands (CurrentFolder, etc.)
+ContextFile=Context		# relative to ~/.im/
+##
+## Default settings
+##
+# folders
+Src=$InboxFolder		# default source of most commands
+Imrm.Src=$TrashFolder		# default source for message cleanups
+# mail address aliases for imali/imput
+AliasesFile=Aliases		# relative to ~/.im/
+# imget/imls
+Form=%5n %m%d %-14A %-18S %b	# default format for scanning
+Width=80			# default width for scanning
+JisSafe=on			# escape seq. of JIS char. should be managed
+Indent=2			# indent step for threading
+DupCheckTarget=message-id	# Duplicate Check Target 
+				# 'message-id' or 'message-id+subject'
+# servers
+Smtpservers=localhost		# default server for SMTP
+NntpServers=localhost		# default server for NNTP
+# imput
+FccDir=$MailDir
+# imget
+Imget.Src=local			# default source of imget (local mailbox)
+PopHistory=pophist		# to save last state (relative to ~/.im/)
+NntpHistory=newshist		# to save last state (relative to ~/.im/)
+__END__

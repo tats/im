@@ -1,0 +1,199 @@
+#! @im_path_perl@
+################################################################
+###
+###				 imhist
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Jul  6, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "imhist @im_version@";
+
+$Prog = 'imhist';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Header;
+use IM::History;
+use IM::Message;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    @Hdr
+	    $opt_lookup $opt_remove $opt_msg $opt_dump $opt_add
+	    $opt_subfolders $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+imhist :: Manage History Database
+$VERSION
+
+Usage: imhist [options]
+";
+
+@OptConfig = (
+    'lookup;s;;'     => 'Look up an entry for specified message-id.',
+    'remove;s;;'     => 'Remove whole information on specified message-id.',
+    'msg;s;;'        => 'Message to be deleted if multiple in database.',
+    'dump;b;;'       => 'Dump database just for debugging.',
+    'add;f;;'        => 'Add information of messages in a specified folder.',
+    'subfolders;b;;' => 'Descend sub folders recursively (option for --add).',
+    'verbose;b;;'    => 'With verbose messages.',
+    'debug;d;;'      => "With debug message.",
+    'help;b;;'       => "Show this message.",
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+if (msgdbfile() eq '') {
+    im_die("MsgDBFile is not defined.\n");
+}
+if ($opt_lookup ne '') {
+    exit $EXIT_ERROR if (open_history(1) < 0);
+#   unless ($opt_lookup =~ /^<.*>$/) {
+#	im_warn("Message-ID should be surrounded by <>.\n");
+#	exit $EXIT_ERROR;
+#   }
+    my $msg = lookup_history($opt_lookup, LookUpMsg);
+    if ($msg eq '') {
+	im_info("no entry found for $opt_lookup\n");
+	exit $EXIT_ERROR;
+    } else {
+	print $msg . "\n";
+    }
+    close_history();
+} elsif ($opt_remove ne '') {
+    exit $EXIT_ERROR if (open_history(1) < 0);
+#   unless ($opt_lookup =~ /^<.*>$/) {
+#	im_warn("Message-ID should be surrounded by <>.\n");
+#	exit $EXIT_ERROR;
+#   }
+    my $num = delete_history($opt_remove, $opt_msg);
+    if ($num < 0) {
+	im_warn("no entry found for $opt_remove\n");
+	exit $EXIT_ERROR;
+    }
+    if ($opt_msg ne '' && $num > 0) {
+	im_info("message $opt_msg for $opt_remove deleted\n");
+    } else {
+	im_info("entry for $opt_remove deleted\n");
+    }
+    close_history();
+} elsif ($opt_dump) {
+    exit $EXIT_ERROR if (open_history(0) < 0);
+    dump_history();
+    close_history();
+} elsif ($opt_add ne '') {
+    my $p = expand_path($opt_add);
+    if (-f $p) {
+	# single file
+	if (open_history(1) < 0) {
+	    exit $EXIT_ERROR;
+	}
+	add_msg_info($p, $opt_add);
+	close_history();
+    } elsif (-d $p) {
+	# folder
+	if (open_history(1) < 0) {
+	    exit $EXIT_ERROR;
+	}
+	add_folder_info($p, $opt_add);
+	close_history();
+    } else {
+	im_warn("no message found to add.\n");
+	exit $EXIT_ERROR;
+    }
+} else {
+    im_warn("no option specified.\n");
+    exit $EXIT_ERROR;
+}
+
+exit $EXIT_SUCCESS;
+
+sub add_msg_info ($$) {
+    my ($path, $msg) = @_;
+    local (@Hdr) = ();
+    if (open(MSG, "<$path")) {
+	&read_header(\*MSG, \@Hdr, 0);
+	my $mid = &header_value(\@Hdr, 'Message-ID');
+#	my $dt = &header_value(\@Hdr, 'Date');
+	(my $ver = &header_value(\@Hdr, 'Mime-Version')) =~ s/\s//g;
+	my $master = '';
+	if ($ver eq '1.0') {
+	    my $ct = &header_value(\@Hdr, 'Content-Type') . ';';
+	    $ct =~ s/\s//g;
+	    if ($ct =~ m|^Message/partial;(.*;)?id=([^;]+);|i) {
+		$master = $2;
+		$master =~ s/^"(.*)"$/$1/;
+	    }
+	}
+	if ($mid ne '') {
+	    store_history($mid, $msg);
+	    store_history("partial:$master", $mid) if ($master ne '');
+	}
+	close (MSG);
+	return 0;
+    }
+    return -1;
+}
+
+sub add_folder_info ($$) {
+    my ($dir, $folder) = @_;
+    $dir =~ s|/$||;
+    im_info("Entering folder $dir\n");
+    chdir ($dir);
+    unless (opendir(FOLDER, $dir)) {
+	im_warn("can't read $dir\n");
+	return -1;
+    }
+    my @lower = ();
+    my $f;
+    foreach $f (readdir(FOLDER)) {
+	if ($f eq '.' || $f eq '..') {
+	} elsif ($f =~ /^\d+$/ && -f $f) {
+	    print(" $f\n");
+	    add_msg_info($f, "$folder/$f");
+	} elsif (-d $f) {
+	    push(@lower, $f);
+	}
+    }
+    closedir(FOLDER);
+    my $l;
+    foreach $l (@lower) {
+	if ($folder eq '+') {
+	    add_folder_info("$dir/$l", "+$l");
+	} else {
+	    add_folder_info("$dir/$l", "$folder/$l");
+	}
+    }
+}
+
+### Local Variables:
+### mode: perl
+### End:

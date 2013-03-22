@@ -1,0 +1,81 @@
+#! @im_path_perl@
+################################################################
+###
+###				 imcd
+###
+###	      Copyright (C) 1997  Internet Message Group
+###
+###		     This Perl5 library conforms
+###		GNU GENERAL PUBLIC LICENSE Version 2.
+###
+###
+### Author:  Internet Message Group <img@mew.org>
+### Created: Apr 23, 1997
+### Revised: @im_revised@
+###
+
+my $VERSION = "imcd @im_version@";
+
+$Prog = 'imcd';
+
+##
+## Require packages
+##
+
+use IM::Config;
+use IM::Folder;
+use integer;
+use strict;
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_src $opt_quiet $opt_verbose $opt_debug $opt_help);
+
+##
+## Environments
+##
+
+$EXPLANATION = "
+$Prog :: Internet Message Change Default Folder
+$VERSION
+
+Usage: $Prog [options]
+";
+
+@OptConfig = (
+    'src;F;;'     => "Set source folder.",
+    'quiet;b;;'   => "Do not bark.",
+    'verbose;b;;' => 'With verbose messages.',
+    'debug;d;;'   => "With debug message.",
+    'help;b;;'    => "Show this message.",
+    );
+
+##
+## Profile and option processing
+##
+
+init_opt(\@OptConfig);
+read_cfg();
+read_opt(\@ARGV); # help?
+help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
+
+debug_option($opt_debug) if $opt_debug;
+
+##
+## Main
+##
+
+my $folder = &cur_folder();
+$folder = $opt_src if (defined $opt_src);
+
+if (! -d &expand_path($folder)) {
+    im_die("no such folder $folder\n");
+}
+
+&set_cur_folder($folder);
+
+print "$folder\n" unless $opt_quiet;
+
+exit $EXIT_SUCCESS;
+
+### Local Variables:
+### mode: perl
+### End:

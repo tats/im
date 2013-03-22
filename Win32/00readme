@@ -1,0 +1,3 @@
+Please intall Mule for Win32 Window Version 1.21 and use
+define-process-argument-editing to execute IM Perl5 script directly.
+For more information, see _some_where_mew_is_/Win32/mew-win32.el.
