@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Scan.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Scan.pm version 20000228(IM140)";
 
 package IM::Scan;
 require 5.003;
@@ -247,8 +247,7 @@ sub get_header ($) {
 	$Head{'folder:'} = '+' . $folder;
     }
 
-    open(MSG, "<$path") || return;
-    binmode(MSG);
+    im_open(\*MSG, "<$path") || return;
 
     ##
     ## Collect file attributes
@@ -356,6 +355,7 @@ sub parse_body (*$) {
 	next if /^\s*[\w-]+: /;		# Headers and header style citation
 	next if /^\s*[\w-]*[>|]/;	# other citation
 	next if /:\n$/;
+	next if /^This is a multi-part message in MIME format./i;
 
 	if (/^In message/ || /^In article/ || /^In <.*>/) {
 	    if ($mode == 0) {
@@ -434,11 +434,11 @@ sub parse_header ($) {
 	}
 
 	$href->{'date:'} = sprintf "%s, %d %s %d %02d:%02d:%02d %s",
-			$WSTR[$wday], $mday, $MSTR[$mon], $year,
+			$WSTR[$wday], $mday, $MSTR[$mon], $year + 1900,
 			$hour, $min, $sec, $tz;
     }
 
-    $href->{'date:'} =~ /(\d\d?)\s+([A-Za-z]+)\s+(\d\d\d?\d?)\s/;
+    $href->{'date:'} =~ /(\d\d?)\s+([A-Za-z]+)\s+(\d+)\s/;
     my ($mday, $monthstr, $year) = ($1, "\u\L$2", $3);
     my $mon = $MSTR2NUM->{$monthstr};
 
@@ -448,9 +448,9 @@ sub parse_header ($) {
 	$sec = $1;
     }
 
-    if ($year < 70) {
+    if ($year < 50) {
 	$year += 2000;
-    } elsif ($year < 100) {
+    } elsif ($year < 1000) {
 	$year += 1900;
     }
     $href->{'year:'} = $year;
@@ -910,7 +910,7 @@ sub read_petnames () {
     }
     my $file = petname_file();
     return unless $file;
-    unless (open(PETNAMES, $file)) {
+    unless (open(PETNAMES, $file)) { ## don't use im_open().
 	im_warn("can't open petname file $file\n");
 	return;
     } 

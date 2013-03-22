@@ -5,24 +5,20 @@
 ###
 ### Author:  Masatoshi Tsuchiya <tsuchiya@pine.kuee.kyoto-u.ac.jp>
 ### Created: Oct 05, 1999
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Ssh.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Ssh.pm version 20000228(IM140)";
 
 package IM::Ssh;
 require 5.003;
 require Exporter;
-use IM::Config qw( connect_timeout command_timeout );
+use IM::Config qw( connect_timeout command_timeout $SSH_PATH );
 use IM::Util;
 use strict;
 use vars qw( @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $SSH $FH @PID );
 @ISA       = qw( Exporter );
 @EXPORT    = qw( ssh_proxy );
-@EXPORT_OK = qw( $SSH );
-
-# Configuration Variables
-$SSH = 'ssh';
 
 # Global Variables
 $FH      = "SSH00000";
@@ -73,9 +69,9 @@ sub ssh_proxy ($$$$) {
 	    im_warn( "Accident in Port Forwading: $buf\n" );
 	} elsif ( $pid == 0 ) {
 	    close $read;
-	    open( STDOUT, ">&$write" );
-	    open( STDERR, ">&$write" );
-	    exec( $SSH, '-n', '-x', '-o', 'BatchMode yes',
+	    open(STDOUT, ">&$write" );
+	    open(STDERR, ">&$write" );
+ 	    exec($SSH_PATH, '-n', '-x', '-o', 'BatchMode yes',
 		  "-L$local:$server:$remote", $host,
 		  sprintf( 'echo ssh_proxy_connect ; sleep %s', &command_timeout() ) );
 	    exit 0;			# Not reach.
@@ -83,7 +79,7 @@ sub ssh_proxy ($$$$) {
 	    sleep 5;
 	    redo FORK;
 	} else {
-	    im_warn( "Can't fork $SSH.\n" );
+	    im_warn( "Can't fork $SSH_PATH.\n" );
 	}
     }
     0;

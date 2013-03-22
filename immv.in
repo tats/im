@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "immv version 991025(IM133)";
+my $VERSION = "immv version 20000228(IM140)";
 
 $Prog = 'immv';
 
@@ -54,7 +54,7 @@ Usage: $Prog [options] +folder... msgs...
     'verbose;b;;' => 'With verbose messages.',
     'debug;d;;'   => "With debug message.",
     'help;b;;'    => "Show this message.",
-    'SSHServer;s;localhost;SSH_server'
+    'SSHServer,S;s;localhost;SSH_server'
                        => 'SSH port relay server.',
     );
 
@@ -188,9 +188,9 @@ sub refile_one ($$$) {
 	if ($NewMsgCache{$dst}){
 	    $NewMsgCache{$dst} =~ s|([^/]+)$|$1+1|e; # increment cache
 	    $dst_path = $NewMsgCache{$dst};
-	    } else {
-		$dst_path = $NewMsgCache{$dst} = get_impath($dst, 'new');
-	    }
+	} else {
+	    $dst_path = $NewMsgCache{$dst} = get_impath($dst, 'new');
+	}
 	if ($opt_link && $src ne "") {
 	    im_link($msg, $dst_path) || die $@;
 	} elsif ($link_it) {

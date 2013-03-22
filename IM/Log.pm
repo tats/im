@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Log.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Log.pm version 20000228(IM140)";
 
 package IM::Log;
 require 5.003;
@@ -103,7 +103,7 @@ sub log_action ($$$$;@) {
     return unless ($file =~ /^(\S+)$/);
     $file = $1;	# to pass through taint check
     &msg_mode(1);
-    unless (open(HISTORY, ">>$file")) {
+    unless (im_open(\*HISTORY, ">>$file")) {
 	im_warn("can't open history file: $file ($!)\n");
 	return;
     }

@@ -2,7 +2,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 ### perl Makefile.PL
 ### make

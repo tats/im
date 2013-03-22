@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Jul 6, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::History.pm version 991025(IM133)";
+my $PM_VERSION = "IM::History.pm version 20000228(IM140)";
 
 package IM::History;
 require 5.003;
@@ -102,12 +102,12 @@ sub history_open ($) {
     return 0 unless ($with_lock);
 
     if ($DBtype eq 'DB') {
-	unless (open(HIST_FH, "+<&=$fd")) {
+	unless (im_open(\*HIST_FH, "+<&=$fd")) {
 	    im_err "history: dup $fd ($!)\n";
 	    return -1;
 	}
     } elsif ($DBtype eq 'NDBM' or $DBtype eq 'SDBM') {
-	unless (open(HIST_FH, "+<$dbfile.pag")) {
+	unless (im_open(\*HIST_FH, "+<$dbfile.pag")) {
 	    im_err "history: open $dbfile.pag ($!)\n";
 	    return -1;
 	}

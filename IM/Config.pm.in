@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Config.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Config.pm version 20000228(IM140)";
 
 package IM::Config;
 require 5.003;
@@ -41,10 +41,10 @@ use vars qw(@ISA @EXPORT);
     nntpservers nntphistoryfile nntpauthuser
     popaccount pophistoryfile imapaccount httpproxy noproxy
     usepwagent pwagentport usepwfiles pwfiles
-    expand_path
+    expand_path usetouchfile touchfile namazuv2
     pop_timeout imap_timeout nntp_timeout dns_timeout
     connect_timeout command_timeout rcv_buf_siz
-    db_type file_attr);
+    db_type file_attr $SSH_PATH);
 
 ##
 ## Constant
@@ -57,7 +57,7 @@ use vars qw($CURRENT_DIR $HOME_DIR $IM_SYS_DIR
 	    %WHO_SET
 	    @SELECTORS
 	    $IM_LIBDIR $IM_DB_TYPE $FSYNC_NO
-	    $prefix $exec_prefix);
+	    $prefix $exec_prefix $SSH_PATH);
 
 ##
 ## configurable value by configure
@@ -68,6 +68,7 @@ $exec_prefix= "@exec_prefix@";
 $IM_LIBDIR  = "@libdir@/im";
 $IM_DB_TYPE = '@im_db_type@';
 $FSYNC_NO = @im_fsync_no@;
+$SSH_PATH = "@im_path_ssh@";
 
 sub file_attr () {
     return @im_file_attr@;
@@ -139,6 +140,9 @@ BEGIN {
     'connecttimeout;i;60;ConnectTimeout'  => 'Timeout for connection making',
     'commandtimeout;i;300;CommandTimeout' => 'Timeout for each command',
     'rcvbufsiz;i;;RcvBufSiz'		=> 'Receive buffer size of TCP',
+    'usetouchfile;b;;UseTouchFile'	=> 'Use touch file',
+    'touchfile;s;;TouchFile'		=> 'Touch file name',
+    'namazuv2;b;;NamazuV2'		=> 'Use Namazu Version 2',
     );
 
     # these vars should be in current package?
@@ -893,6 +897,14 @@ sub pwfiles () {
     return $PwFiles;
 }
 
+sub usetouchfile () {
+    return $UseTouchFile;
+}
+
+sub touchfile () {
+    return $TouchFile;
+}
+
 sub pop_timeout () {
     return $PopTimeout;
 }
@@ -923,6 +935,10 @@ sub rcv_buf_siz () {
 
 sub db_type () {
     return $IM_DB_TYPE;
+}
+
+sub namazuv2 () {
+    return $NamazuV2;
 }
 
 ###
@@ -1009,6 +1025,8 @@ Imrm.dst=$TrashFolder		# default trash folder
 AddrBookFile=Addrbook		# relative to ~/.im/
 AliasesFile=Aliases		# relative to ~/.im/
 #PetnameFile=Petnames		# relative to ~/.im/
+UseTouchFile=off
+TouchFile=.mew-touch
 # imget/imls
 Form=%+5n %m%d %-14A %S || %b	# default format for scanning
 Width=80			# default width for scanning
@@ -1027,6 +1045,8 @@ QueueDir=queue			# relative to ~/.im/
 Imget.Src=local			# default source of imget (local mailbox)
 PopHistory=pophist-{POPSERVERID}	# to save last state (relative to ~/.im/)
 NntpHistory=newshist		# to save last state (relative to ~/.im/)
+# namazu
+NamazuV2=off			# use Namazu version2 (1.9.x or late)
 __END__
 
 ### Copyright (C) 1997, 1998, 1999 IM developing team

@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Imap.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Imap.pm version 20000228(IM140)";
 
 package IM::Imap;
 require 5.003;
@@ -944,7 +944,7 @@ sub imap_put_file ($$$) {
     my @Message;
     local (*SRC);
 
-    unless (open(SRC, "<$src_path")) {
+    unless (im_open(\*SRC, "<$src_path")) {
 	im_warn("can't open local message $src_path.\n");
 	return -1;
     }

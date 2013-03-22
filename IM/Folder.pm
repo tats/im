@@ -5,16 +5,16 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Folder.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Folder.pm version 20000228(IM140)";
 
 package IM::Folder;
 require 5.003;
 require Exporter;
 
-use IM::Config qw(expand_path context_file inbox_folder folder_mode);
+use IM::Config qw(expand_path context_file inbox_folder folder_mode usetouchfile touchfile);
 use IM::Util;
 use integer;
 use strict;
@@ -84,7 +84,7 @@ sub cur_folder () {
     return inbox_folder() if (! -f context_file());
 
     $folder = '';
-    open(IN, '< ' . context_file()) || im_die("can't open context file.\n");
+    im_open(\*IN, '< ' . context_file()) || im_die("can't open context file.\n");
     while (<IN>) {
 	chomp;
 	if (/^CurrentFolder[:=]\s*(\S+)$/) {
@@ -103,7 +103,7 @@ sub set_cur_folder ($) {
     $buf = '';
 
     if (-f context_file()) {
-	open(IN, '<' . context_file()) || im_die("can't open context file.\n");
+	im_open(\*IN, '<' . context_file()) || im_die("can't open context file.\n");
 	while (<IN>) {
 	    chomp;
 	    next if (/^CurrentFolder[:=]\s*(\S+)$/);
@@ -112,7 +112,7 @@ sub set_cur_folder ($) {
 	close(IN);
     }
 
-    open(OUT, '>' . context_file()) || im_die("can't open context file.\n");
+    im_open(\*OUT, '>' . context_file()) || im_die("can't open context file.\n");
     print OUT $buf;
     print OUT "CurrentFolder=$folder\n";
     close(OUT);
@@ -277,6 +277,20 @@ sub get_message_paths ($@) {
 	return ();
     }
 
+    # ad hoc but fast
+    if (scalar(@messages0) == 1 && $messages0[0] eq 'new') {
+	local(*MDIR);
+	my($i);
+	my $max = "0";
+	opendir(MDIR, $folder_dir) || im_die("can't open $folder.\n");
+	while (defined($i = readdir(MDIR))) {
+	    $max = $i if ($max < $i and $i =~ /^\d+$/);
+	}
+	$max++;
+	closedir(MDIR);
+	return "$folder_dir/$max";
+    }
+
     my @filesinfolder = message_list($folder_dir);
 
     @messages = @x = ();
@@ -318,11 +332,13 @@ sub create_folder ($) {
 }
 
 sub touch_folder ($) {
-    if (&win95p){
-	my ($dir) = shift;
-	$dir =~ s/\/\d+$//;
-	$dir = &expand_path($dir);
-	system "utime $dir";
+    if (&usetouchfile()) {
+ 	my ($dir) = shift;
+ 	$dir =~ s/\/\d+$//;
+ 	$dir = &expand_path($dir);
+ 	my($file) = ($dir . "/" . &touchfile());
+	im_open(\*OF,">$file");
+	close(OF);
     } elsif (&os2p) {
 	my ($dir) = shift;
 	$dir =~ s/\/\d+$//;

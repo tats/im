@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Jul  6, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imhist version 991025(IM133)";
+my $VERSION = "imhist version 20000228(IM140)";
 
 $Prog = 'imhist';
 
@@ -139,7 +139,7 @@ exit $EXIT_SUCCESS;
 sub add_msg_info ($$) {
     my ($path, $msg) = @_;
     local (@Hdr) = ();
-    if (open(MSG, "<$path")) {
+    if (im_open(\*MSG, "<$path")) {
 	&read_header(\*MSG, \@Hdr, 0);
 	my $mid = &header_value(\@Hdr, 'Message-ID');
 #	my $dt = &header_value(\@Hdr, 'Date');

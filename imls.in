@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Dec 31, 1995
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imls version 991025(IM133)";
+my $VERSION = "imls version 20000228(IM140)";
 
 $Prog = 'imls';
 
@@ -74,7 +74,7 @@ Usage :: $Prog [options] [+folder] [range]
     'verbose;b;;' => 'With verbose messages.',
     'debug;d;;'   => "With debug message.",
     'help;b;;'    => 'Show this message',
-    'SSHServer;s;localhost;SSH_server'
+    'SSHServer,S;s;localhost;SSH_server'
                        => 'SSH port relay server.',
     );
 
@@ -402,15 +402,21 @@ sub vscan () {
 sub vscan_namazu (@) {
     my $num = shift;
     my $nmzidx;
+    my $nmzargs;
 
     $num = 1 if($num eq 'all');
+    if (&namazuv2()) {
+	$nmzargs = "--all --list --early";
+    } else {
+	$nmzargs = "-aeS";
+    }
 
     binmode(STDOUT);
     foreach (@opt_src) {
-	my $nmzidx = $_;
+	my $nmzidx = expand_path($_);
 	my @messages = ();
 
-	open( NMZ, "namazu -aeS \"$opt_grep\" $nmzidx|") 
+	im_open(\*NMZ, "namazu $nmzargs \"$opt_grep\" $nmzidx|") 
 	    || im_err( "namazu error\n");
 	@messages = sort {$a <=> $b} <NMZ>;
 	close( NMZ );
@@ -418,6 +424,7 @@ sub vscan_namazu (@) {
 	foreach ( @messages ) {
 	    chop;
 	    s/^\/([a-zA-Z])\|/\1:/;
+	    $_ = expand_path($_);
 	    if ( -f $_ ) {
 		my %Head = &get_header($_);
 		$Head{'pnum'} = $Head{'number:'};

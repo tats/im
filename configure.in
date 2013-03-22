@@ -26,6 +26,7 @@ AC_SUBST(im_usecl)
 AC_SUBST(im_nosync)
 AC_SUBST(im_fsync_no)
 AC_SUBST(im_hostname)
+AC_SUBST(im_path_ssh)
 IM_PATH_PERLV_PROGS(im_path_perl, perl perl5, PERL5_NOT_FOUND)
 case "$im_path_perl" in
 ""|PERL5_NOT_FOUND)
@@ -97,6 +98,14 @@ case "$host" in
     AC_MSG_RESULT([Not a Solaris; Content-Length: can be ignored])
     im_usecl=no ;;
 esac
+
+im_path_ssh='yes'
+AC_ARG_WITH(ssh,
+[  --with-ssh=PATH        Use PATH as SSH location],
+[im_path_ssh="${withval}"])
+if test "x$im_path_ssh" = 'xyes'; then
+    AC_PATH_PROG(im_path_ssh, ssh, '/usr/local/bin/ssh')
+fi
 
 AC_MSG_CHECKING([domain for mail-address])
 im_hostname=`hostname`

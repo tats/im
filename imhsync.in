@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Jul 02, 1998
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imhsync version 991025(IM133)";
+my $VERSION = "imhsync version 20000228(IM140)";
 
 $Prog = 'imhsync';
 
@@ -99,7 +99,7 @@ sub db_refile ($$) {
     my ($msg, $folder) = @_;
     my ($multi_folder);
     local (@Hdr) = ();
-    if (open(MSG, "<$msg")) {
+    if (im_open(\*MSG, "<$msg")) {
 	&read_header(\*MSG, \@Hdr, 0);
 	close (MSG);
 	my $mid = &header_value(\@Hdr, 'Message-ID');

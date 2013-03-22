@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::MsgStore.pm version 991025(IM133)";
+my $PM_VERSION = "IM::MsgStore.pm version 20000228(IM140)";
 
 package IM::MsgStore;
 require 5.003;
@@ -247,7 +247,7 @@ sub open_fcc ($$) {
     unless ($fcc_dir) {
 	msg_mode(1);
 	im_debug("FCC file: $fcc_folder\n") if (&debug('fcc'));
-	unless (open(FCC, ">>$fcc_folder")) {
+	unless (im_open(\*FCC, ">>$fcc_folder")) {
 	    im_warn("can't open FCC file: $fcc_folder\n");
 	    return undef;
 	}
@@ -289,7 +289,7 @@ sub open_fcc ($$) {
 sub excl_create (*$) {
     (local *MESSAGE, my $file) = @_;
     msg_mode(1);
-    return -1 unless (sysopen(MESSAGE, $file, file_attr()));
+    return -1 unless (im_sysopen(\*MESSAGE, $file, file_attr()));
     return 0;
 }
 

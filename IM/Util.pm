@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Util.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Util.pm version 20000228(IM140)";
 
 package IM::Util;
 require 5.003;
@@ -26,7 +26,7 @@ use vars qw(@ISA @EXPORT
 	     progname
 	     im_getlogin
 	     im_msg im_info im_debug im_notice im_warn im_err im_die im_die2
-	     im_save_error im_saved_errors
+	     im_save_error im_saved_errors im_open im_sysopen
 	     debug_option set_debug debug set_verbose verbose
 	     flush);
 
@@ -251,6 +251,28 @@ sub flush (*) {
     print '';
     $| = 0;
     select($old);
+}
+
+#
+# open file
+#
+
+sub im_open($$) {
+    my ($d, $a) = @_;
+    my ($r);
+    if ($r = open($d, $a)) {
+	binmode($d);
+    }
+    return $r;
+}
+
+sub im_sysopen($$$) {
+    my ($d, $f, $a) = @_;
+    my ($r);
+    if ($r = sysopen($d, $f, $a)) {
+	binmode($d);
+    }
+    return $r;
 }
 
 1;

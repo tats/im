@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::TcpTransaction.pm version 991025(IM133)";
+my $PM_VERSION = "IM::TcpTransaction.pm version 20000228(IM140)";
 
 package IM::TcpTransaction;
 require 5.003;
@@ -25,7 +25,7 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw(log_transaction
 	connect_server tcp_command send_command next_response send_data
 	command_response set_command_response tcp_logging
-	get_session_log set_cur_server get_cur_server
+	get_session_log set_cur_server get_cur_server get_cur_server_original_form
 	pool_priv_sock);
 
 =head1 NAME
@@ -43,7 +43,7 @@ $return_code = &tcp_command(socket, command_string, log_flag);
 
 =cut
 
-use vars qw($Cur_server $Session_log $TcpSockName
+use vars qw($Cur_server $Cur_server_original_form $Session_log $TcpSockName
 	    $SOCK @Response $Logging @SockPool @Sock6Pool);
 BEGIN {
     $Cur_server = '';
@@ -64,10 +64,10 @@ sub log_transaction () {
 #	return value: handle if success
 #
 sub connect_server ($$$) {
-    my ($servers, $proto, $root) = @_;
+    my ($servers, $serv, $root) = @_;
 
     if ($#$servers < 0) {
-	im_err("no server specified for $proto\n");
+	im_err("no server specified for $serv\n");
 	return '';
     }
 
@@ -75,35 +75,12 @@ sub connect_server ($$$) {
 
     no strict 'refs'; # XXX
     local (*SOCK) = \*{$TcpSockName};
-    $SOCK = $proto;
+    $SOCK = $serv;
     @Response = ();
-    my ($pe_name, $pe_aliases, $pe_proto);
-    my ($se_name, $se_aliases, $se_port);
-    ($pe_name, $pe_aliases, $pe_proto) = getprotobyname ('tcp') if (unixp());
-    unless ($pe_name) {
-	$pe_proto = 6;
-    }
-    ($se_name, $se_aliases, $se_port) = getservbyname ($proto, 'tcp')
-	if (unixp());
-    unless ($se_name) {
-	if ($proto eq 'smtp') {
-	    $se_port = 25;
-	} elsif ($proto eq 'http') {
-	    $se_port = 80;
-	} elsif ($proto eq 'nntp') {
-	    $se_port = 119;
-	} elsif ($proto eq 'pop3') {
-	    $se_port = 110;
-	} elsif ($proto eq 'imap') {
-	    $se_port = 143;
-	} else {
-	    im_err("unknown service: $proto\n");
-	    return '';
-	}
-    }
-    my ($he_name, $he_alias, $he_type, $he_len, $he_addr, @he_addrs);
-    my ($family, $s, $localport, $remoteport, $sin);
-    while ($s = shift(@$servers)) {
+    my (@he_infos);
+    my ($s, $localport, $remoteport);
+    foreach $s (@$servers) {
+	$Cur_server_original_form = $s;
 	my ($r) = ($#$servers >= 0) ? 'skipped' : 'failed';
 	# manage server[/remoteport]%localport
 	if ($s =~ s/\%(\d+)$//) {
@@ -112,7 +89,7 @@ sub connect_server ($$$) {
 	    if ($s =~ s/\/(\d+)$//) {
 		$remoteport = $1;
 	    } else {
-		$remoteport = $se_port;
+		next unless ($remoteport = getserv($serv, 'tcp'));
 	    }
 	    if ($main::SSH_server eq 'localhost') {
 		im_warn( "Don't use port-forwarding to `localhost'.\n" );
@@ -123,11 +100,11 @@ sub connect_server ($$$) {
 		    $Cur_server = "$Cur_server%$remoteport";
 		} else { # Connection failed.
 		    im_warn( "Can't login to $main::SSH_server\n" );
-		    if ($proto eq 'smtp') {
-			&log_action($proto, $Cur_server,
+		    if ($serv eq 'smtp') {
+			&log_action($serv, $Cur_server,
 				    join(',', @main::Recipients), $r, @Response);
 		    } else { # NNTP
-			&log_action($proto, $Cur_server,
+			&log_action($serv, $Cur_server,
 				    $main::Newsgroups, $r, @Response);
 		    }
 		    next;
@@ -140,67 +117,42 @@ sub connect_server ($$$) {
 	    $s = $1;
 	    $Cur_server = "$s/$remoteport";
 	} else {
-	    $remoteport = $se_port;
+	    $remoteport = $serv;
 	    $Cur_server = $s;
 	}
-	if ($s =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
-	    @he_addrs = (pack('C4', $1, $2, $3, $4));
-	    $family = AF_INET;
-	} elsif ($s =~ /^[\da-f:]+$/i) {
-	    if ($s =~ /::.*::/) {
-		im_err("bad server address in IPv6 format: $s\n");
-		return '';
+	$0 = progname() . ": im_getaddrinfo($s)";
+	@he_infos = im_getaddrinfo($s, $remoteport, AF_UNSPEC, SOCK_STREAM);
+	if ($#he_infos < 0) {
+	    im_warn("address unknown for $s\n");
+	    @Response = ("address unknown for $s");
+	    if ($serv eq 'smtp') {
+		&log_action($serv, $Cur_server,
+			    join(',', @main::Recipients), $r, @Response);
+	    } else { # NNTP
+		&log_action($serv, $Cur_server,
+			    $main::Newsgroups, $r, @Response);
 	    }
-	    if ($s =~ /::/) {
-		(my $t = $s) =~ s/[^:]//g;
-		my $n = 7 - length($t);
-		$t = ':0:';
-		while ($n--) {
-		    $t .= '0:';
-		}
-		$s =~ s/::/$t/;
-	    }
-	    if ($s =~ /^([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*)$/i) {
-		@he_addrs = (pack('n8',
-		    hex("0x$1"), hex("0x$2"), hex("0x$3"), hex("0x$4"),
-		    hex("0x$5"), hex("0x$6"), hex("0x$7"), hex("0x$8")));
-		$family = inet6_family(); # AF_INET6
-	    } else {
-		im_err("bad server address in IPv6 format: $s\n");
-		return '';
-	    }
-	} else {
-	    alarm(dns_timeout()) unless win95p();
-	    $0 = progname() . ": gethostbyname($s)";
-	    ($he_name, $he_alias, $he_type, $he_len, @he_addrs)
-	      = gethostbyname ($s);
-	    alarm(0) unless win95p();
-	    unless ($he_name) {
-		im_warn("address unknown for $s\n");
-		@Response = ("address unknown for $s");
-		if ($proto eq 'smtp') {
-		    &log_action($proto, $Cur_server,
-				join(',', @main::Recipients), $r, @Response);
-		} else { # NNTP
-		    &log_action($proto, $Cur_server,
-				$main::Newsgroups, $r, @Response);
-		}
-		next;
-	    }
-	    $family = $he_type;
+	    next;
 	}
-
-	foreach $he_addr (@he_addrs) {
+	while ($#he_infos >= 0) {
+	    my ($family, $socktype, $proto, $sin, $canonname)
+		= splice(@he_infos, 0, 5);
 	    if ($root && unixp()) {
 		my $name = priv_sock($family);
+		my $port;
 		if ($name eq '') {
 		    im_err("privilege port pool is empty.\n");
 		    return '';
 		}
+		if ($family == AF_INET) {
+		    $port = (unpack_sockaddr_in($sin))[0];
+		} else {
+		    $port = (inet6_unpack_sockaddr_in6($sin))[0];
+		}
 		*SOCK = \*{$name};
-		$SOCK = $proto;
+		$SOCK = $port;
 	    } else {
-		unless (socket(SOCK, $family, SOCK_STREAM, $pe_proto)) {
+		unless (socket(SOCK, $family, $socktype, $proto)) {
 		    im_err("socket creation failed: $!.\n");
 		    return '';
 		}
@@ -212,19 +164,14 @@ sub connect_server ($$$) {
                 }
 	    }
 
-	    if ($family == AF_INET) {
-		$sin = &pack_sockaddr_in($remoteport, $he_addr);
-	    } else { # AF_INET6
-		$sin = inet6_pack_sockaddr_in6($family, $remoteport, $he_addr);
-	    }
-	    im_notice("opening $proto session to $s($remoteport).\n");
+	    im_notice("opening $serv session to $s($remoteport).\n");
 	    alarm(connect_timeout()) unless win95p();
-	    $0 = progname() . ": connecting to $s with $proto";
+	    $0 = progname() . ": connecting to $s with $serv";
 	    if (connect (SOCK, $sin)) {
 		alarm(0) unless win95p();
 		select (SOCK); $| = 1; select (STDOUT);
 		$Session_log .= 
-		    "Transcription of $proto session follows:\n" if ($Logging);
+		    "Transcription of $serv session follows:\n" if ($Logging);
 		im_debug("handle $TcpSockName allocated.\n")
 		    if (&debug('tcp'));
 		$TcpSockName++;
@@ -234,16 +181,16 @@ sub connect_server ($$$) {
 	    alarm(0) unless win95p();
 	    close(SOCK);
 	}
-	im_notice("$proto server $s($remoteport) did not respond.\n");
-	if ($proto eq 'smtp') {
-	    &log_action($proto, $Cur_server,
+	im_notice("$serv server $s($remoteport) did not respond.\n");
+	if ($serv eq 'smtp') {
+	    &log_action($serv, $Cur_server,
 			join(',', @main::Recipients), $r, @Response);
 	} else { # NNTP
-	    &log_action($proto, $Cur_server,
+	    &log_action($serv, $Cur_server,
 			$main::Newsgroups, $r, @Response);
 	}
     }
-    im_warn("WARNING: $proto connection was not established.\n");
+    im_warn("WARNING: $serv connection was not established.\n");
     return '';
 }
 
@@ -409,11 +356,15 @@ sub get_cur_server () {
     return $Cur_server;
 }
 
+sub get_cur_server_original_form () {
+    return $Cur_server_original_form;
+}
+
 sub pool_priv_sock ($) {
     my $count = shift;
 
     pool_priv_sock_af($count, AF_INET);
-    pool_priv_sock_af($count, inet6_family());
+    pool_priv_sock_af($count, inet6_family()) if (eval '&AF_INET6');
 }
 
 sub pool_priv_sock_af ($$) {
@@ -439,9 +390,8 @@ sub pool_priv_sock_af ($$) {
 		$ANYADDR = pack('C4', 0, 0, 0, 0);
 		$psin = pack_sockaddr_in($privport, $ANYADDR);
 	    } else {
-		$ANYADDR = pack('C16', 0, 0, 0, 0, 0, 0, 0, 0,
-				       0, 0, 0, 0, 0, 0, 0, 0);
-		$psin = inet6_pack_sockaddr_in6($family, $privport, $ANYADDR);
+		$ANYADDR = pack('N4', 0, 0, 0, 0);
+		$psin = inet6_pack_sockaddr_in6($privport, $ANYADDR);
 	    }
 	    last if (bind (*{$TcpSockName}, $psin));
 	    im_warn("privileged socket binding failed: $!.\n")
@@ -482,15 +432,114 @@ sub alarm_func {
     im_die("connection error\n");
 }
 
-sub inet6_pack_sockaddr_in6 ($$;$) {
-    my ($family, $port, $he_addr) = @_;
+sub im_getaddrinfo ($$;$$$$) {
+    return getaddrinfo(@_) if (defined &getaddrinfo);
 
-    if (eval '&AF_INET6') {   # perl supports IPv6
-	return pack_sockaddr_in6($port, $he_addr);
-    } else {
-	return pack('CCnN', 1+1+2+4+16+4, $family, $port, 0) . $he_addr .
-		    pack('N', 0);
+    my ($node, $serv, $family, $socktype, $proto, $flags) = @_;
+
+    my ($pe_name, $pe_aliases, $pe_proto, $se_port);
+    if (unixp()) {
+	$proto = 'tcp' unless ($proto);
+	($pe_name, $pe_aliases, $pe_proto) = getprotobyname($proto);
     }
+    $pe_proto = 6 unless ($pe_name);
+    return unless ($se_port = getserv($serv, $proto));
+
+    my ($he_name, $he_alias, $he_type, $he_len, @he_addrs);
+    if ($node =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+	@he_addrs = (pack('C4', $1, $2, $3, $4));
+	$family = AF_INET;
+    } elsif ($node =~ /^[\da-f:]+$/i) {
+	if ($node =~ /::.*::/) {
+	    im_err("bad server address in IPv6 format: $node\n");
+	    return;
+	}
+	if ($node =~ /::/) {
+	    (my $t = $node) =~ s/[^:]//g;
+	    my $n = 7 - length($t);
+	    $t = ':0:';
+	    while ($n--) {
+		$t .= '0:';
+	    }
+	    $node =~ s/::/$t/;
+	}
+	if ($node =~ /^([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*):([\da-f]*)$/i) {
+	    @he_addrs = (pack('n8',
+		    hex("0x$1"), hex("0x$2"), hex("0x$3"), hex("0x$4"),
+		    hex("0x$5"), hex("0x$6"), hex("0x$7"), hex("0x$8")));
+	    $family = inet6_family(); # AF_INET6
+	} else {
+	    im_err("bad server address in IPv6 format: $node\n");
+	    return;
+	}
+    } else {
+	alarm(dns_timeout()) unless win95p();
+	($he_name, $he_alias, $he_type, $he_len, @he_addrs)
+	  = gethostbyname($node);
+	alarm(0) unless win95p();
+	return unless ($he_name);
+	$family = $he_type;
+    }
+
+    my ($he_addr, @infos);
+    foreach $he_addr (@he_addrs) {
+	my $sin;
+	if ($family == AF_INET) {
+	    $sin = pack_sockaddr_in($se_port, $he_addr);
+	} else {
+	    $sin = inet6_pack_sockaddr_in6($se_port, $he_addr);
+	}
+	push(@infos, $family, $socktype, $pe_proto, $sin, $he_name);
+    }
+    @infos;
+}
+
+sub getserv($$) {
+    my ($serv, $proto) = @_;
+
+    my ($se_port);
+    if ($serv =~ /^\d+$/o) {
+	$se_port = $serv;
+    } else {
+	my ($se_name, $se_aliases);
+	($se_name, $se_aliases, $se_port) = getservbyname($serv, $proto)
+	    if (unixp());
+	unless ($se_name) {
+	    if ($serv eq 'smtp') {
+		$se_port = 25;
+	    } elsif ($serv eq 'http') {
+		$se_port = 80;
+	    } elsif ($serv eq 'nntp') {
+		$se_port = 119;
+	    } elsif ($serv eq 'pop3') {
+		$se_port = 110;
+	    } elsif ($serv eq 'imap') {
+		$se_port = 143;
+	    } else {
+		im_err("unknown service: $serv\n");
+		return undef;
+	    }
+	}
+    }
+    $se_port;
+}
+
+sub inet6_pack_sockaddr_in6 ($;$) {
+    return pack_sockaddr_in6(@_) if (defined &pack_sockaddr_in6);
+
+    my ($port, $he_addr) = @_;
+    pack('CCnN', 1+1+2+4+16+4, inet6_family(), $port, 0) . $he_addr .
+	pack('N', 0);
+}
+
+sub inet6_unpack_sockaddr_in6 ($) {
+    return unpack_sockaddr_in6(@_) if (defined &unpack_sockaddr_in6);
+
+    my $sock = shift;
+    my ($len, $family, $port, $flow, $a1, $a2, $a3, $a4)
+	= unpack('CCnNN4', $sock);
+    my $addr = pack('N4', $a1, $a2, $a3, $a4);
+    ($port, $addr);
 }
 
 sub inet6_family () {

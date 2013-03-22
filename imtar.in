@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 08, 1998
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imtar version 991025(IM133)";
+my $VERSION = "imtar version 20000228(IM140)";
 
 $Prog = 'imtar';
 
@@ -89,8 +89,7 @@ sub make_mmdf ($$$) {
     if ($dst eq "stdout") {
         binmode(STDOUT);
     } else {
-        if (open(MMDF,">>$dst")) {
-            binmode(MMDF);
+        if (im_open(\*MMDF,">>$dst")) {
             select MMDF;   # xxx
         } else {
             im_die("cannot open $dst\n");
@@ -108,8 +107,7 @@ sub make_mmdf ($$$) {
 sub open_msg ($) {
     my $msg = $_;
     my $mmdf_delimiter="\001\001\001\001";
-    if (open(ART, "<$msg")) {
-        binmode(ART);
+    if (im_open(\*ART, "<$msg")) {
         print "$mmdf_delimiter\n";
         print while(<ART>);
         print "$mmdf_delimiter\n";

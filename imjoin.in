@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  5, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imjoin version 991025(IM133)";
+my $VERSION = "imjoin version 20000228(IM140)";
 
 $Prog = 'imjoin';
 
@@ -106,7 +106,7 @@ sub join_msg ($) {
     my $total = 0;
     my ($path, $header);
     foreach $path (@paths) {
-	if (open(MSG, "<$path")) {
+	if (im_open(\*MSG, "<$path")) {
 	    $/ = "\n\n";
 	    $header = <MSG>;
 	    $/ = "\n";
@@ -157,7 +157,7 @@ sub join_msg ($) {
 
     # show in sequence
     for ($i = 1; $i <= $#index; $i++) {
-	if (open(MSG, "<$index[$i]")) {
+	if (im_open(\*MSG, "<$index[$i]")) {
 	    $/ = "\n\n";
 	    if ($i == 1) {		# first partial message
 		my $header = <MSG>;	# header of enclosing message
@@ -221,7 +221,7 @@ sub get_paths ($) {
 	$path = $msg;
     }
 
-    if (open(MSG, "<$path")) {
+    if (im_open(\*MSG, "<$path")) {
 	$/ = "\n\n";
 	$header = <MSG>;
 	$/ = "\n";

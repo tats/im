@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 27, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Recipient.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Recipient.pm version 20000228(IM140)";
 
 package IM::Recipient;
 require 5.003;
@@ -231,24 +231,25 @@ sub expn_rcpt_list ($$) {
 sub rcpt_pickup ($$$) {
     my ($Header, $resend_flag, $news_only_flag) = @_;
     my $line;
+    my $resend_prefix;
 
     foreach $line (@$Header) {
-	if ($line =~ /^Dcc:(.*)/is) {
-	    return -1 if (&parse_rcpt(0, $1, 0) < 0);
-	} elsif ($line =~ /^Bcc:(.*)/is) {
-	    return -1 if (&parse_rcpt($main::Mime_bcc, $1, 0) < 0);
-	} elsif ($line =~ /^Fcc:(.*)/is) {
+	if ($line =~ /^Fcc:(.*)/is) {
 	    $main::Fcc_folder = $1;
 	    $main::Fcc_folder =~ s/\s//g;
-	} elsif (!$news_only_flag) {
-	    unless ($resend_flag) {
-		if ($line =~ /^(To|Cc):(.*)/is) {
-		    return -1 if (&parse_rcpt(0, $2, 0) < 0);
-		}
-	    } else {
-		if ($line =~ /^Resent-(To|Cc):(.*)/is) {
-		    return -1 if (&parse_rcpt(0, $2, 0) < 0);
-		}
+	}
+	if ($news_only_flag) {
+	    if ($line =~ /^Dcc:(.*)/is) {
+		return -1 if (&parse_rcpt(0, $1, 0) < 0);
+	    } elsif ($line =~ /^Bcc:(.*)/is) {
+		return -1 if (&parse_rcpt($main::Mime_bcc, $1, 0) < 0);
+	    }
+	} else {
+	    $resend_prefix = $resend_flag ? "Resent-" : "";
+	    if ($line =~ /^${resend_prefix}(To|Cc|Dcc):(.*)/is) {
+		return -1 if (&parse_rcpt(0, $2, 0) < 0);
+	    } elsif ($line =~ /^${resend_prefix}Bcc:(.*)/is) {
+		return -1 if (&parse_rcpt($main::Mime_bcc, $1, 0) < 0);
 	    }
 	}
     }
@@ -264,7 +265,7 @@ no strict 'refs';
 sub include_open ($) {
     my ($file) = shift;
     return undef if $Include_Files{$file};
-    open($file, $file) || return undef;
+    im_open($file, $file) || return undef;
     $Include_Files{$file} = 1;
     return $file;
 }

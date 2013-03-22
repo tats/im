@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Aug 31, 1995
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imput version 991025(IM133)";
+$VERSION = "imput version 20000228(IM140)";
 
 $Prog = 'imput';
 
@@ -1179,11 +1179,10 @@ sub read_message {
 	}
 	$message_file = &expand_path($d);
     }
-    unless (open(READ, "<$message_file")) {
+    unless (im_open(\*READ, "<$message_file")) {
 	im_err("Can not open: $message_file\n");
 	&error_exit;
     }
-    binmode(READ);
     if (&read_header(\*READ, \@Header, 0) < 0) {
 	&error_exit;
     }
@@ -1206,7 +1205,7 @@ sub read_mp_message {
     } else {
 	$message_file = &expand_path($file);
     }
-    unless (open(MP_READ, "<$message_file")) {
+    unless (im_open(\*MP_READ, "<$message_file")) {
 	im_err("Can not open: $message_file\n");
 	&error_exit;
     }
@@ -1586,7 +1585,7 @@ sub append_dist_header {
     }
     my ($message_file) = &expand_path($d);
     local (*DIST);
-    unless (open(DIST, "<$message_file")) {
+    unless (im_open(\*DIST, "<$message_file")) {
 	im_err("Can not open: $message_file\n");
 	&error_exit;
     }
@@ -1622,17 +1621,15 @@ sub annotate {
 	my $tmp = &conf_dir . "/anno$$\_"
 			. substr($cur,rindex($cur,"/")+1,-1) . ".tmp";
 	# copy to temporary file
-	unless (open(ORIGINAL, "<$cur")) {
+	unless (im_open(\*ORIGINAL, "<$cur")) {
 	    im_notice("anno: open failed(1): $cur ($!).\n");
 	    next;
 	}
-	unless (open(TMP, ">$tmp")) {
+	unless (im_open(\*TMP, ">$tmp")) {
 	    im_err("anno: creation failed: $tmp ($!).\n");
 	    close(ORIGINAL);
 	    return -1;
 	}
-	binmode(TMP);
-	binmode(ORIGINAL);
 	print TMP $first . $second;
 	my $checked = 0;
 	my $inheader = 1;
@@ -1677,19 +1674,17 @@ sub annotate {
 	    return -1;
 	}
 	# copy back to original file (in case of links)
-	unless (open(TMP, "<$tmp")) {
+	unless (im_open(\*TMP, "<$tmp")) {
 	    im_err("anno: open failed(2): $tmp ($!).\n");
 	    unlink($tmp);
 	    return -1;
 	}
-	unless (open(ORIGINAL, "+<$cur")) {
+	unless (im_open(\*ORIGINAL, "+<$cur")) {
 	    im_err("anno: open failed(3): $cur ($!).\n");
 	    close(TMP);
 	    unlink($tmp);
 	    return -1;
 	}
-	binmode(TMP);
-	binmode(ORIGINAL);
 	my $size = -s ORIGINAL;
 	seek(ORIGINAL, 0, 2);
 	unless (print ORIGINAL $first . $second) {
@@ -1707,14 +1702,12 @@ sub annotate {
 	    unlink($tmp);
 	    return -1;
 	}
-	unless (open(ORIGINAL, "+<$cur")) {
+	unless (im_open(\*ORIGINAL, "+<$cur")) {
 	    im_err("anno: open failed(4): $cur ($!).\n");
 	    close(TMP);
 	    unlink($tmp);
 	    return -1;
 	}
-	binmode(TMP);
-	binmode(ORIGINAL);
 	while (<TMP>) {
 	    unless (print ORIGINAL $_) {
 		close(TMP);
@@ -1760,7 +1753,7 @@ sub process_queue {
 	next unless ($q =~ /^\d+$/);
 #	$QUEUE = 'QUEUE';
 	rename ("$queue_dir/$q", "$queue_dir/$q.wrk");
-	unless (open(QUEUE, "<$queue_dir/$q.wrk")) {
+	unless (im_open(\*QUEUE, "<$queue_dir/$q.wrk")) {
 	    im_err("can't open $queue_dir/$q.wrk\n");
 	    rename ("$queue_dir/$q.wrk", "$queue_dir/$q");
 	    return;
@@ -1782,6 +1775,7 @@ sub process_queue {
 	    if (/^S:(.*)/)   { $Sender = $1; next; }
 	    if (/^SSV:(.*)/) { @Smtp_servers = split(',', $1); next; }
 	    if (/^NSV:(.*)/) { @Nntp_servers = split(',', $1); next; }
+	    if (/^SSH:(.*)/) { $SSH_server = $1; next; }
 	    if (/^R:(.*)/)   { @Recipients = split(',', $1); next; }
 	    if (/^RQ:(.*)/)  { $User_require = $1; next; }
 	    im_warn("unknown environment: $_\n");
@@ -1907,6 +1901,7 @@ sub queue_message {
     print QUEUE "RQ:$User_require\n";
     print QUEUE "SSV:$Smtp_servers\n";
     print QUEUE "NSV:$Nntp_servers\n";
+    print QUEUE "SSH:$SSH_server\n";
     print QUEUE "R:".join(',', @Recipients)."\n";
     print QUEUE "\n";
 
@@ -1925,6 +1920,7 @@ sub queue_message {
     }
     im_notice("queued in $queue_dir/$max\n");
     &log_action('queue', &get_cur_server(), $max, 'queued');
+    touch_folder($queue_dir);
     return 0;
 }
 
@@ -1939,16 +1935,15 @@ sub error_report {
     @Smtp_servers = split(',', $Smtp_servers);
     push(@Smtp_servers, split(',', $Emg_Smtp_servers));
 
-    do {
-	$rc = &smtp_transaction_for_error_notify(\@Smtp_servers,
-	  \@Header, \@Body);
-	if ($rc) {
-	    &smtp_close;
-	    my @resp = &command_response;
-	    &log_action($Esmtp_flag ? 'esmtp' : 'smtp', &get_cur_server(),
-			join(',', @Recipients), 'skipped', @resp);
-	}
-    } while ($rc > 0 && $#Smtp_servers >= 0);
+    for (my $i = 0; $i <= $#Smtp_servers; $i++) {
+	$rc = smtp_transaction_for_error_notify($Smtp_servers[$i],
+					\@Smtp_servers, \@Header, \@Body);
+	return 0 if ($rc == 0);
+
+	smtp_close();
+	log_action($Esmtp_flag ? 'esmtp' : 'smtp', get_cur_server(),
+		   join(',', @Recipients), 'skipped', command_response());
+    }
     if ($rc) {
 	im_warn($errlog);
 	&set_command_response;
@@ -1976,17 +1971,16 @@ sub error_exit {
 	@Smtp_servers = split(',', $Smtp_servers);
 	push(@Smtp_servers, split(',', $Emg_Smtp_servers));
 
-	do {
-	    $rc = &smtp_transaction_for_error_notify(\@Smtp_servers,
-	      \@Header, \@Body);
-	    if ($rc) {
-		&smtp_close;
-		my (@resp) = &command_response;
-		&log_action($Esmtp_flag ? 'esmtp' : 'smtp', &get_cur_server(),
-			    join(',', @Recipients), 'skipped', @resp);
-	    }
+	for (my $i = 0; $i <= $#Smtp_servers; $i++) {
+	    $rc = &smtp_transaction_for_error_notify($Smtp_servers[$i],
+					     \@Smtp_servers, \@Header, \@Body);
+	    last if ($rc == 0);
 
-	} while ($rc > 0 && $#Smtp_servers >= 0);
+	    smtp_close();
+	    log_action($Esmtp_flag ? 'esmtp' : 'smtp', get_cur_server(),
+		       join(',', @Recipients), 'skipped', command_response());
+
+	}
 	if ($rc) {
 #	    im_warn($errlog);
 	    &set_command_response;

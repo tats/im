@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  5, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imcat version 991025(IM133)";
+my $VERSION = "imcat version 20000228(IM140)";
 
 $Prog = 'imcat';
 
@@ -112,7 +112,7 @@ if ($msg =~ /^http:/i) {
 	print $BOUNDARY if $opt_boundary;
 	foreach (split(',', $msg)) {
 	    my $path = &expand_path($_);
-	    if (open(MSG, "<$path")) {
+	    if (im_open(\*MSG, "<$path")) {
 
 		while (<MSG>) {
 		    print;
@@ -127,7 +127,7 @@ if ($msg =~ /^http:/i) {
 	my $path = &message_name($opt_src, $msg);
 	&join_msg($path) if ($opt_join);
 	print $BOUNDARY if $opt_boundary;
-	if (open(MSG, "<$path")) {
+	if (im_open(\*MSG, "<$path")) {
 	    while (<MSG>) {
 		print;
 	    }
@@ -209,7 +209,7 @@ sub join_msg ($) {
 	} else {
 	    $path = $_;
 	}
-	if (open(MSG, "<$path")) {
+	if (im_open(\*MSG, "<$path")) {
 	    $/ = "\n\n";
 	    $header = <MSG>;
 	    $/ = "\n";
@@ -265,7 +265,7 @@ sub join_msg ($) {
 	    im_warn("no path for message $locate, skipping.\n");
 	    next;
 	}
-	if (open(MSG, "<$path")) {
+	if (im_open(\*MSG, "<$path")) {
 	    $/ = "\n\n";
 	    $header = <MSG>;
 	    $/ = "\n";
@@ -317,7 +317,7 @@ sub join_msg ($) {
 
     # show in sequence
     for ($i = 1; $i <= $#paths; $i++) {
-	if (open(MSG, "<$paths[$i]")) {
+	if (im_open(\*MSG, "<$paths[$i]")) {
 	    $/ = "\n\n";
 	    if ($i == 1) {		# first partial message
 		my $header = <MSG>;	# header of enclosing message

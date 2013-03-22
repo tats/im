@@ -1,3 +1,69 @@
+140 (2000/02/28) mew-release release
+
+* Patches for namazu.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+
+139 (2000/02/21) mew-dist release
+
+* Patches for namazu.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+
+138 (2000/02/15) mew-dist release
+
+* Managing SMTP servers correctly.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>	
+* im_getaddrinfo patch.
+	Hajimu UMEMOTO <ume@mahoroba.org>
+* SSH path in configure.in.
+	Hajimu UMEMOTO <ume@mahoroba.org>
+* SSH port patch.
+	Hajimu UMEMOTO <ume@mahoroba.org>
+* binmode vs open patch
+	Shuichi KITAGUCHI <kit@Mew.org>
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>	
+
+137 (2000/01/28) mew-dist release
+
+* X-Dispatcher fix.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+
+136 (2000/01/13) mew-dist release
+
+* Bug fixes for a side-effect of connect_server.
+* Touch folder hack.
+	Shuichi KITAGUCHI <kit@Mew.org>
+* QueuePath instead of QueueFolder to get along with Mew 1.94.
+* Fixing TcpTransaction.pm.
+	Hajimu UMEMOTO <ume@mahoroba.org>
+
+135 (2000/01/05) mew-dist release
+
+* Y2K fixes for broken year and no Date: field.
+	SAITO Tetsuya <saito@Mew.org>
+* MailDir hack.
+	nosuzuki@e-mail.ne.jp (Norio Suzuki)
+* A bug fix for SMTP server selection.
+	Masatoshi Tsuchiya <tsuchiya@pine.kuee.kyoto-u.ac.jp>
+* Fixing Resent-* stuff.
+	Koga Youichirou <y-koga@ccs.mt.nec.co.jp>
+* A bug fix for "Fcc: =folder"
+	Carlo Strozzi <carlos@linux.it>
+* IN-USE patch for Pop.pm.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* touch_folder for +queue.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+* Making get_impath( , 'new') faster.
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+	Hideaki YOSHIFUJI <yoshfuji@ecei.tohoku.ac.jp>
+
+134 (99/11/24) mew-dist release
+
+* imput uses +queue.
+* Change "-s" to "-S" for the SSH option.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* Skip "This is a multi-part message in MIME format".
+	Makoto Fujiwara <makoto@ki.nu>
+
 133 (99/10/25) mew-dist release
 
 * The SSHServer option for several commands.

@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Pop.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Pop.pm version 20000228(IM140)";
 
 package IM::Pop;
 require 5.003;
@@ -88,7 +88,11 @@ sub pop_open ($$$$) {
 	}
 	$resp =  &send_command(\*POPd, "PASS $pass", 'PASS ********');
 	if ($resp !~ /^\+/) {
-	    im_err("invalid password ($prompt) [$resp].\n");
+	    if ($resp =~ /IN-USE/) {
+		im_err("session is in use ($prompt) [$resp].\n");
+	    } else {
+		im_err("invalid password ($prompt) [$resp].\n");
+	    }
 	    return -1;
 	}
     } elsif ($auth eq 'RPOP') {
@@ -301,7 +305,7 @@ sub pop_process ($$$$) {
 	    return -1;
 	}
 	im_notice("reading POP history: $histfile\n");
-	if (open (HIST, "<$histfile")) {
+	if (im_open(\*HIST, "<$histfile")) {
 	    while (<HIST>) {
 		chomp;
 		if (/^(\S+)\s(\d+)$/) {
@@ -407,7 +411,7 @@ sub pop_process ($$$$) {
 
 	if ($new > 0 && $main::opt_keep != 0) {
 	    im_notice("writing UIDL history: $histfile\n");
-	    if (open (HIST, ">$histfile")) {
+	    if (im_open(\*HIST, ">$histfile")) {
 		if ($keep_proto eq 'UIDL') {
 		    for ($i = 1; $i <= $msgs; $i++) {
 			if (($h = $uidl[$i]) ne '' && $history{$h} > 0) {

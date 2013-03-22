@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Nov 03, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Grep.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Grep.pm version 20000228(IM140)";
 
 package IM::Grep;
 require 5.003;
@@ -105,7 +105,7 @@ sub grep_folder ($$$@) {
 	my($all, $head, $body) = ('', '', '');
 	local($/);
 
-	unless (open(MES, "< $m")) {
+	unless (im_open(\*MES, "< $m")) {
 	    if (! $main::opt_quiet) {
 		im_warn("message $m not exists: $!\n");
 	    }

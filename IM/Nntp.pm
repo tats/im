@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::Nntp.pm version 991025(IM133)";
+my $PM_VERSION = "IM::Nntp.pm version 20000228(IM140)";
 
 package IM::Nntp;
 require 5.003;
@@ -68,7 +68,7 @@ sub nntp_open ($$) {
     my $rc;
 
     if ($Nntp_opened) {
-	return 0 if (grep(&get_cur_server() eq $_, @$servers));
+	return 0 if (grep(&get_cur_server_original_form() eq $_, @$servers));
 	&nntp_close;
     }
     &tcp_logging($logging);
@@ -411,8 +411,7 @@ sub set_last_article_number ($$$) {
     $server =~ s!/\d+$!!;
     my $nntphist = &nntphistoryfile() . '-' . $server;
     if ( -f $nntphist ) {
-	open (NEWSHIST, "+<$nntphist");
-	binmode(NEWSHIST);
+	im_open(\*NEWSHIST, "+<$nntphist");
 	while ($pos = tell(NEWSHIST), $_ = <NEWSHIST>) {
 	    /^([^:]+):\s*(\d+)/;
 	    if ($group eq $1) {
@@ -435,8 +434,7 @@ sub set_last_article_number ($$$) {
 	  }
     } else {
 #	open (NEWSHIST, ">$nntphist");
-	sysopen(NEWSHIST, $nntphist, O_RDWR()|O_CREAT());
-	binmode(NEWSHIST);
+	im_sysopen(\*NEWSHIST, $nntphist, O_RDWR()|O_CREAT());
     }
     seek(NEWSHIST, 0, 2);
     printf NEWSHIST "$group: %${size}s%07d\n", '', $number;
@@ -452,8 +450,7 @@ sub get_last_article_number ($$) {
     $server =~ s!\%\d+$!!;
     $server =~ s!/\d+$!!;
     my $nntphist = &nntphistoryfile() . '-' . $server;
-    if (open (NEWSHIST, "<$nntphist")) {
-        binmode(NEWSHIST);
+    if (im_open(\*NEWSHIST, "<$nntphist")) {
 	while (<NEWSHIST>) {
 	    /^([^:]+):\s*(\d+)/;
 	    if ($group eq $1) {

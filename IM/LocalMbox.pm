@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Oct 25, 1999
+### Revised: Feb 28, 2000
 ###
 
-my $PM_VERSION = "IM::LocalMbox.pm version 991025(IM133)";
+my $PM_VERSION = "IM::LocalMbox.pm version 20000228(IM140)";
 
 package IM::LocalMbox;
 require 5.003;
@@ -195,7 +195,7 @@ sub local_get_msg ($$$$$) {
 		return -1;
 	    }
 
-	    unless (open (SAVE, "+>$mbox")) {
+	    unless (im_open(\*SAVE, "+>$mbox")) {
 		im_err("can't open $mbox ($!).\n");
 		close(SAVE);
 		return -1;
@@ -250,10 +250,10 @@ sub local_copymbox ($$) {
     my ($src, $dst) = @_;
 
     im_debug("copy from $src to $dst\n") if (&debug('local'));
-    unless (open(SRC, "<$src")) {
+    unless (im_open(\*SRC, "<$src")) {
 	return -1;
     }
-    unless (open(DST, "+>$dst")) {
+    unless (im_open(\*DST, "+>$dst")) {
 	return -1;
     }
     while (<SRC>) {
@@ -297,7 +297,7 @@ sub process_maildir ($$$$) {
 	    return -1;
 	}
 	foreach $f (sort {(-M $b) <=> (-M $a) || $a cmp $b} readdir(FLDR)) {
-	    if ($f =~ /^\d+\.\d+\..+/ && -s "$dir/$f") {
+	    if ($f =~ /^\d+\.(\d+|\d+_\d+)\..+/ && -s "$dir/$f") {
 		my $ret = process_file("$dir/$f", $dst, $how, $noscan);
 		next if ($ret > 0);	# skip by rule
 		if ($ret < 0) {
@@ -323,7 +323,7 @@ sub process_file ($$$$) {
     local (*MBOX);
 
     im_notice("opening MBOX ($mbox)\n");
-    unless (open(MBOX, "<$mbox")) {
+    unless (im_open(\*MBOX, "<$mbox")) {
 	# XXX not found or unreadable...
 	return -1;
     }
@@ -357,7 +357,7 @@ sub process_mbox ($$$$$) {
     im_info("Getting new messages from local mailbox into $dst....\n")
 	if ($how eq 'get');
     im_warn("opening MBOX ($mbox)\n") if (&verbose);
-    unless (open(MBOX, "<$mbox")) {
+    unless (im_open(\*MBOX, "<$mbox")) {
 	# XXX not found or unreadable...
 	return -1;
     }
@@ -530,7 +530,7 @@ sub save_message ($$$$) {
 sub local_empty ($) {
     my $mbox = shift;
     unless (truncate($mbox, 0)) {
-	unless (open(MBOX, ">$mbox")) {
+	unless (im_open(\*MBOX, ">$mbox")) {
 	    im_warn("mailbox can not be zeroed.\n");
 	    return;
 	}
@@ -563,7 +563,7 @@ sub local_lockmbox ($$) {
 #	    sleep(5);
 #	}
 
-	unless (open(LOCKFILE, ">$base.$$")) {
+	unless (im_open(\*LOCKFILE, ">$base.$$")) {
 	    im_warn("can't create lock file $base.$$: $!\n");
 	    im_warn("use 'flock' instead of 'file' if possible.\n");
 	    return -1;
@@ -585,7 +585,7 @@ sub local_lockmbox ($$) {
 	$locked_by_file = 1;
     }
     if ($type =~ /flock/) {
-	unless (open(LOCK_FH, "+<$base")) {
+	unless (im_open(\*LOCK_FH, "+<$base")) {
 	    im_err "can't open $base :$!\n";
 	    return -1;
 	}
