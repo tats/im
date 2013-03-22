@@ -8,7 +8,7 @@
 ### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::History.pm version 20070423(IM149)";
+my $PM_VERSION = "IM::History.pm version 20100215(IM150)";
 
 package IM::History;
 require 5.003;

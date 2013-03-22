@@ -8,7 +8,7 @@
 ### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::EncDec.pm version 20070423(IM149)";
+my $PM_VERSION = "IM::EncDec.pm version 20100215(IM150)";
 
 package IM::EncDec;
 require 5.003;
@@ -99,6 +99,10 @@ sub mime_encode_string($$$) {
 		    $point ++;
 		}
 		$nstr = $nstr . "\n";
+		if ($s eq chr(27)) {
+		    # IN
+		    $in = 1;
+		}
 	    }
 	}
 	if ($in == 1) {
@@ -137,7 +141,7 @@ sub mime_decode_string($) {
 
 sub mime_decode($$$) {
     my($cs, $bq, $str) = @_;
-    my $ret = &{$$mime_decode_switch{uc($3)}}($4);
+    my $ret = &{$$mime_decode_switch{uc($bq)}}($str);
     if ($cs =~ /iso-8859-([2-9])/i) {
 	$ret = iso_8859_to_ctext($ret, $1);
     } elsif ($cs =~ /koi8-r/i) {

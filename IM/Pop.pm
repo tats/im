@@ -8,7 +8,7 @@
 ### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::Pop.pm version 20070423(IM149)";
+my $PM_VERSION = "IM::Pop.pm version 20100215(IM150)";
 
 package IM::Pop;
 require 5.003;
@@ -164,8 +164,6 @@ sub pop_retr($$$) {
     }
 
     return -1 if (store_message(\@Message, $dst, $noscan) < 0);
-    &exec_getsbrfile($dst);
-
     return 0;
 }
 
@@ -512,6 +510,7 @@ sub pop_inc($$$$$$$$) {
     flush('STDOUT');
     if ($got > 0) {
 	im_info("$got message(s).\n");
+	&exec_getsbrfile($dst);
     } else {
 	im_info("no new message at $host.\n");
     }

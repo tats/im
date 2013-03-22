@@ -1,3 +1,11 @@
+		Differences between IM 150 and IM 149
+
+* NamazuV2=yes by default.
+* New option MknmzOptions for immknmz. (e.g. MknmzOptions=--decode-base64)
+* For compatibility with MH/nmh's send command, -msgid, -nomsgid, -nomime,
+  -noverbose, -version and -help options are added to imput.
+* Bug fix for IM/Pop.pm and IM/EncDec.pm.
+
 		Differences between IM 149 and IM 148
 
 * As a security countermeasure, reject non-ASCII characters for APOP

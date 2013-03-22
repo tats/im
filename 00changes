@@ -1,3 +1,22 @@
+150 (2010/02/15)
+
+* IM/Pop.pm: Move exec_getsbrfile() from pop_repr() to pop_inc() to work
+  GetSbr correctly. (Thanks to Jacques Garrigue)
+* imput.in: Add msgid, nomsgid, nomime, noverbose, version and help to
+  @CmpConfig, and Doc fix. (Thanks to HAT)
+* IM/EncDec.pm (mime_encode_string): Fix that iso-2022-jp strings are garbled
+  to iso-8859-1.
+* IM/EncDec.pm (mime_decode): Use local variables $bq and $str instead of
+  numbered variables. (Thanks to Kiyoshi OHGISHI)
+* IM/Config.pm.in: Set NamazuV2=yes as the default value.
+* IM/Config.pm.in: New subroutine mknmz_options.
+* immknmz.in: Use mknmz_options.
+* imsetup.in, cnf.im/SiteConfig.in, dot.im/Config: Add comment for
+  MknmzOptions.
+* IM/Scan.pm, imput.in: Typo fix.
+* configure: Update using Debian autoconf 2.65-3.
+* config.guess, config.sub: Update using Debian autotools-dev 20090611.1.
+
 149 (2007/04/23)
 
 * IM/Pop.pm (pop_open): Don't allow non-ASCII characters for APOP timestamp.
@@ -50,7 +69,7 @@
   mknmz_include_file, mknmz_ignore_folders_regex): New subroutines.
 * IM/Config.pm.in: Set Immknmz.Src to blank.
 * immknmz.in: New option, `--src'.  Folders can be specified.
-  (thanks to Hideyuki SHIRAI, [Mew-dist 13633] on 13 Jul 2000)
+  (Thanks to Hideyuki SHIRAI, [Mew-dist 13633] on 13 Jul 2000)
 * Message fixes.
 * imget.in: Doc fix.
 * IM/Scan.pm (parse_body): Revise regexp.
