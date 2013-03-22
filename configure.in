@@ -11,6 +11,7 @@ AC_INIT(imget.in)
 dnl Checks for programs.
 AC_PROG_INSTALL()
 AC_CANONICAL_HOST
+AC_PROG_CC
 AC_PROG_CPP
 
 im_file_attr="Fcntl::O_RDWR()|Fcntl::O_CREAT()|Fcntl::O_EXCL()"
@@ -23,6 +24,7 @@ AC_SUBST(im_src_siteperl)
 AC_SUBST(im_my_siteperl)
 AC_SUBST(im_usecl)
 AC_SUBST(im_nosync)
+AC_SUBST(im_fsync_no)
 AC_SUBST(im_hostname)
 IM_PATH_PERLV_PROGS(im_path_perl, perl perl5, PERL5_NOT_FOUND)
 case "$im_path_perl" in
@@ -51,19 +53,26 @@ AC_ARG_ENABLE(rpop,
 [im_rpop="-o root -m 4555"],
 [im_rpop="-m 555"],)
 
-dnl check fsync() is in syscall.h or sys/syscall.h
+dnl check fsync() is in sys/syscall.h
 im_nosync="undefined"
-for im_check_headers in sys/syscall.h syscall.h
-do
-	AC_CHECK_HEADER($im_check_headers,
-			AC_EGREP_CPP(sys_fsync_is_found,
-			[#include <$im_check_headers>
-			 #ifdef SYS_fsync
-			 sys_fsync_is_found
-			 #endif],
-			im_nosync="no",
-			im_nosync="yes"),)
-done
+AC_CHECK_HEADER(sys/syscall.h,
+cat > conftest.c << EOF
+#include <sys/syscall.h>
+#ifdef SYS_fsync
+IM_FSYNC_NO=SYS_fsync
+#else
+IM_FSYNC_NO=undef
+#endif
+EOF
+
+im_fsync_no=`eval $ac_cpp conftest.c | sed -n -e "s/^IM_FSYNC_NO=//p"`
+if test "x$im_fsync_no" = "xundef"; then
+  im_nosync="yes"
+else
+  im_nosync="no"
+fi
+rm -f conftest.c
+)
 
 im_src_siteperl="use lib '`pwd`';	###DELETE-ON-INSTALL###"
 AC_ARG_WITH(perldir,
@@ -91,7 +100,8 @@ im_hostname=`hostname`
 AC_MSG_RESULT([$im_hostname])
 
 AC_OUTPUT(imali:imali.in imcat:imcat.in imcd:imcd.in imclean:imclean.in \
-	imget:imget.in imgrep:imgrep.in imhist:imhist.in \
+	imget:imget.in imgrep:imgrep.in \
+	imhist:imhist.in imhsync:imhsync.in \
 	imjoin:imjoin.in imls:imls.in immv:immv.in \
 	impack:impack.in impath:impath.in imput:imput.in \
 	impwagent:impwagent.in \
@@ -104,7 +114,7 @@ AC_OUTPUT(imali:imali.in imcat:imcat.in imcd:imcd.in imclean:imclean.in \
 	imls immv impack impath imput impwagent imrm imsetup imsort imstore\
 	imtar)
 
-dnl Copyright (C) 1997, 1998 IM developing team.
+dnl Copyright (C) 1997, 1998, 1999 IM developing team.
 dnl All rights reserved.
 dnl 
 dnl Redistribution and use in source and binary forms, with or without

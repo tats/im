@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Config.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Config.pm version 990905(IM130)";
 
 package IM::Config;
 require 5.003;
@@ -30,14 +30,15 @@ use vars qw(@ISA @EXPORT);
     help
     home_dir conf_dir
     mail_dir mail_path news_dir news_path queue_dir queue_path
-    inbox_folder draft_folder trash_folder config_cases
+    inbox_folder draft_folder trash_folder config_cases config_case_inbox
     preserve_dot
-    folder_mode msg_mode allowcrlf no_sync
-    aliases_file context_file getsbr_file scansbr_file petname_file
+    folder_mode msg_mode allowcrlf no_sync fsync_no
+    addrbook_file aliases_file petname_file
+    context_file getchksbr_file getsbr_file scansbr_file scan_header_pick
     address addresses_regex
     msgdbfile msgdbtype
     mbox_style
-    nntpservers nntphistoryfile
+    nntpservers nntphistoryfile nntpauthuser
     popaccount pophistoryfile imapaccount httpproxy noproxy
     usepwagent pwagentport usepwfiles pwfiles
     expand_path
@@ -55,7 +56,7 @@ use vars qw($CURRENT_DIR $HOME_DIR $IM_SYS_DIR
 	    $O_FOPT %C_DESC %C_VNAM
 	    %WHO_SET
 	    @SELECTORS
-	    $IM_LIBDIR $IM_DB_TYPE
+	    $IM_LIBDIR $IM_DB_TYPE $FSYNC_NO
 	    $prefix $exec_prefix);
 
 ##
@@ -66,6 +67,7 @@ $prefix="@prefix@";
 $exec_prefix= "@exec_prefix@";
 $IM_LIBDIR  = "@libdir@/im";
 $IM_DB_TYPE = '@im_db_type@';
+$FSYNC_NO = @im_fsync_no@;
 
 sub file_attr () {
     return @im_file_attr@;
@@ -105,18 +107,22 @@ BEGIN {
     'nosync;b;;NoSync'		=> 'Do not need fsync(2) on writing file',
     'allowcrlf;b;;AllowCRLF'		=> 'CRLF may be in saved message',
     'preservedot;b;;PreserveDot'	=> 'Not substitute "." with "/"',
+    'addrbookfile;s;;AddrBookFile'      => 'Address book file',
     'aliasesfile;s;;AliasesFile'        => 'Aliases file',
+    'petnamefile;s;;PetNameFile'	=> 'PetName file',
     'contextfile;s;Context;ContextFile'	=> 'Context file',
     'address;s;;Address'		=> 'Email addresses',
     'addrregex;s;;AddrRegex'		=> 'Email addresses by regex',
     'msgdbfile;s;;MsgDBFile'		=> 'Message database location',
     'msgdbtype;s;;MsgDBType'		=> 'Message database type',
-    'petnamefile;s;;PetNameFile'	=> 'PetName file',
+    'getchksbr;s;;GetChkSbrFile'	=> 'GetChk hook subroutine script',
     'getsbr;s;;GetSbrFile'		=> 'Get hook subroutine script',
     'scansbr;s;;ScanSbrFile'		=> 'Scan hook subroutine script',
+    'scanheaderpick;s;;ScanHeaderPick'  => 'Scan headers to pick up',
     'mboxstyle;s;;MBoxStyle'		=> 'Style of local MBox format',
     'nntpservers;s;;NNTPservers'	=> 'List of NNTP servers',
     'nntphistory;s;;NNTPhistory'	=> 'Status file of NNTP access',
+    'nntpauthuser;s;;NNTPauthuser'	=> 'User name for NNTP authentication',
     'popaccount;s;;POPaccount'		=> 'Account info for POP access',
     'pophistory;s;;POPhistory'		=> 'Status file of POP access',
     'imapaccount;s;;IMAPaccount'	=> 'Account info for IMAP access',
@@ -297,6 +303,8 @@ sub read_cfg () {
     my ($profile, @profiles);
     my $prev_line = '';
     my $case;
+    my $use;
+    my @USECASES;
     my @prog_cfg;
 
     @profiles = ('<DATA>', $IM_SYS_PROFILE, $IM_USER_PROFILE);
@@ -344,6 +352,11 @@ sub read_cfg () {
 		}
 		next;
 	    }
+	    if (/^use\s+(.*)/) {
+		($use = $1) =~ s/\s*//g;
+		my @array = ($case, $use);
+		push(@USECASES, \@array);
+	    }
 	    if (/^(\*|[\w]+)\.(\w+)[:=]\s*(.*)$/) {
 		# Imls.Src=+inbox
 		if ($1 eq '*') {
@@ -373,6 +386,12 @@ sub read_cfg () {
     my $array;
     foreach $array (@prog_cfg) {
 	set_value_cfg(@$array);
+    }
+    foreach $array (@USECASES) {
+	($case, $use) = @$array;
+	foreach (split(',', $case)) {
+	    set_selector($use, $_);
+	}
     }
 }
 
@@ -444,19 +463,25 @@ sub read_opt ($) {
     }
 }
 
-sub set_selector ($) {
-    my $selector = shift;
+sub set_selector ($;$) {
+    my ($selector, $base) = @_;
     my $s;
 
-    foreach $s (split(',', lc($selector))) {
+    foreach $s (split(',', $selector)) { ### xxx lc
 	next if ($s eq 'default');
 	unless (defined(%{$s})) {
 	    im_err("no 'case $s' in config file.\n");
 	    return -1;
 	} else {
-	    push(@SELECTORS, $s);
-	    foreach (keys(%{$s})){
-		${$_} = $s->{$_};
+	    if (!defined($base) or $base eq 'default') {
+	        push(@SELECTORS, $s) if !defined($base);
+	        foreach (keys(%{$s})){
+	    	    ${$_} = $s->{$_};
+	        }
+	    } else {
+	        foreach (keys(%{$s})){
+		    $base->{$_} = $s->{$_};
+	        }
 	    }
 	}
     }
@@ -552,10 +577,10 @@ sub set_value_cfg ($$$)
 	$vnam = $C_VNAM{$name};
     }
     if ($vnam && $desc) {
-	if ($case eq 'default') {
+        foreach (split(',', $case)) {
+	    if ($_ eq 'default') {
 		set_value($desc, $vnam, $val, 'cfg');
-	} else {
-	    foreach (split(',', $case)) {
+	    } else {
 		set_value_case($desc, $vnam, $val, $_);
 	    }
 	}
@@ -629,7 +654,7 @@ sub set_value_case ($$$$)
 
     # require numeric but not numeric, return undef
     return undef if ($desc =~ /i/ && $val !~ /\d+/);
-    $case = lc($case);
+##    $case = lc($case); #xxx
 
     if ($desc =~ /[bB]/) {
 	if ($val =~ /^(yes|on|true|1)$/i) {
@@ -691,8 +716,15 @@ sub queue_path () {
     expand_path(queue_dir());
 }
 
-sub inbox_folder () {
-    return $InboxFolder;
+sub inbox_folder (;$) {
+    my ($case) = split(',', shift); ## use the first one only
+    if (defined($case) && $case ne 'default' &&
+	defined($case->{InboxFolder}) &&
+	$case->{InboxFolder} ne ''){
+	return $case->{InboxFolder};
+    } else {
+	return $InboxFolder;
+    }
 }
 
 sub draft_folder () {
@@ -709,6 +741,21 @@ sub config_cases () {
 	return join(',', @cases);
     } else {
 	return '';
+    }
+}
+
+sub config_case_inbox () {
+    my @cases = keys(%CASES);
+    my @caseinbox = ();
+    if (scalar(@cases) >= 2) {
+	foreach (@cases) {
+	    if (defined($_->{InboxFolder})) {
+		push(@caseinbox, "$_:$_->{InboxFolder}");
+	    }
+	}
+        return join(',', @caseinbox);
+    } else {
+  	return '';
     }
 }
 
@@ -729,7 +776,7 @@ sub msg_mode ($) {
     my $setumask = shift;
 
     $MsgMode = oct($MsgMode) if ($MsgMode =~ /^0\d/);
-    my $umask = 0777 ^ $MsgMode;
+    my $umask = 0666 ^ $MsgMode;
     umask($umask) if ($setumask);
     return $MsgMode;
 }
@@ -742,6 +789,14 @@ sub no_sync () {
     return $NoSync;
 }
 
+sub fsync_no () {
+    return $FSYNC_NO;
+}
+
+sub addrbook_file () {
+    return join(',', map {expand_path($_)} split(',', $AddrBookFile));
+}
+
 sub aliases_file () {
     return join(',', map {expand_path($_)} split(',', $AliasesFile));
 }
@@ -750,12 +805,20 @@ sub context_file () {
     return &expand_path($ContextFile);
 }
 
+sub getchksbr_file () {
+    return &expand_path($GetChkSbrFile);
+}
+
 sub getsbr_file () {
     return &expand_path($GetSbrFile);
 }
 
 sub scansbr_file () {
     return &expand_path($ScanSbrFile);
+}
+
+sub scan_header_pick () {
+    return $ScanHeaderPick;
 }
 
 sub petname_file () {
@@ -788,6 +851,10 @@ sub nntpservers () {
 
 sub nntphistoryfile () {
     return &expand_path($NNTPhistory);
+}
+
+sub nntpauthuser () {
+    return $NNTPauthuser;
 }
 
 sub popaccount () {
@@ -881,7 +948,7 @@ sub expand_home ($) {
 sub expand_path ($) {
     my $folder = shift;
 
-    $folder =~ s/\s*//g;
+    $folder =~ s/^\s*(.*?)\s*$/$1/; # SPC may be used in folder names
     return '' unless $folder;
 
     if ($folder =~ /^\//) {
@@ -936,17 +1003,20 @@ ContextFile=Context		# relative to ~/.im/
 # folders
 Src=$InboxFolder		# default source of most commands
 Imclean.Src=$TrashFolder	# default source for message cleanups
-Imget.dst=$InboxFolder		# default inbox folder
+#Imget.dst=$InboxFolder		# default inbox folder
 Imrm.dst=$TrashFolder		# default trash folder
 # mail address aliases for imali/imput
+AddrBookFile=Addrbook		# relative to ~/.im/
 AliasesFile=Aliases		# relative to ~/.im/
+PetnameFile=Petnames		# relative to ~/.im/
 # imget/imls
-Form=%+5n %m%d %-14A %-18S %b	# default format for scanning
+Form=%+5n %m%d %-14A %S || %b	# default format for scanning
 Width=80			# default width for scanning
 JisSafe=on			# escape seq. of JIS char. should be managed
 Indent=2			# indent step for threading
 DupCheckTarget=message-id	# Duplicate Check Target 
 				# 'message-id' or 'message-id+subject'
+ImGrep.DupCheckTarget=none
 # servers
 Smtpservers=localhost		# default server for SMTP
 NntpServers=localhost		# default server for NNTP
@@ -955,11 +1025,11 @@ FccDir=$MailDir
 QueueDir=queue			# relative to ~/.im/
 # imget
 Imget.Src=local			# default source of imget (local mailbox)
-PopHistory=pophist		# to save last state (relative to ~/.im/)
+PopHistory=pophist-{POPSERVERID}	# to save last state (relative to ~/.im/)
 NntpHistory=newshist		# to save last state (relative to ~/.im/)
 __END__
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

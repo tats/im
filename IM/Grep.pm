@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Nov 03, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Grep.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Grep.pm version 990905(IM130)";
 
 package IM::Grep;
 require 5.003;
@@ -16,11 +16,12 @@ require Exporter;
 
 use IM::Config;
 use IM::Util;
-use IM::Folder qw(message_range);
+use IM::Folder qw(message_list message_range);
 use IM::Japanese;
+use IM::EncDec qw(mime_decode_string);
 use integer;
 use strict;
-use vars qw(@ISA @EXPORT);
+use vars qw(@ISA @EXPORT %MESSAGE_ID_HASH);
 
 @ISA = qw(Exporter);
 @EXPORT = qw(parse_expression grep_folder sortuniq);
@@ -47,11 +48,16 @@ $eval_string = &parse_expression($expression, $casefold);
 ##
 
 # regexp for range syntax (sequence not supported)
-my $range_element = '(\\d+|cur|first|last|next|prev|new)';
+my $range_element = '(\\d+|first|last|next|prev|new)';
 my $range_regexp = "($range_element(-$range_element|:[+-]?\\d+)?|all)";
 
-sub grep_folder ($$@) {
-    my ($folder, $eval_string, @ranges) = @_;
+# end of header in draft message
+my $draft_delimiter = "\n----\n";
+
+%MESSAGE_ID_HASH = ();
+
+sub grep_folder ($$$@) {
+    my ($folder, $eval_string, $dup_check, @ranges) = @_;
     my $folder_dir;
     my @src_msgs = ();
     my @messages = ();
@@ -70,12 +76,13 @@ sub grep_folder ($$@) {
     im_debug("entered $folder_dir\n") if &debug('all');
 
     # collect message numbers
+    my @filesinfolder = message_list($folder_dir);
     foreach ( @ranges ) {
 	my @tmp = ();
 	im_die("illegal range specification: $_\n")
 	    unless /^$range_regexp$/;
 	im_debug("extract range $_\n") if &debug('all');
-	if (( @tmp = message_range($folder, $_)) eq '') {
+	if (( @tmp = message_range($folder, $_,  @filesinfolder )) eq '') {
 	    im_warn("message $_ out of range\n");
 	}
 	push(@src_msgs, @tmp);
@@ -87,26 +94,76 @@ sub grep_folder ($$@) {
 
     im_debug("uniqified messages \"@src_msgs\"\n") if &debug('all');
 
-    my $m;
-  GREP:
-    foreach $m (@src_msgs) {
-	my ($all, $head, $body) = ('', '', '');
-	if ( open(MES, "< $m") ){
-	    {
-		local($/);
-		$all = scalar(<MES>);
-		($head, $body) = split($main::opt_delimiter, $all, 2);
-	    }
-	    close(MES);
+    # dirty quick hack to determine what part is required
+    # should be implemented better
+    my(%find) = ('head' => scalar($eval_string =~ /\$head\s*=~/),
+		 'body' => scalar($eval_string =~ /\$body\s*=~/),
+		 'all'  => scalar($eval_string =~ /\$all\s*=~/));
 
-	    $head =~ s/\n\s+/ /g; # fix continuation lines
-	    $_ = $all;
-	    if (eval $eval_string) {
-		@messages = (@messages, $m);
-	    }
-	} else {
+    my $m;
+    foreach $m (@src_msgs) {
+	my($all, $head, $body) = ('', '', '');
+	local($/);
+
+	unless (open(MES, "< $m")) {
 	    if (! $main::opt_quiet) {
 		im_warn("message $m not exists: $!\n");
+	    }
+	    next;
+	}
+
+	# read $head anyway
+	#
+	$/ = '';
+	$head = <MES>;
+
+	# if the header contains draft-style header delimiter,
+	# truncate the header and seek to the beginning of body.
+	my $p = index($head, $draft_delimiter);
+	if ($p >= 0) {
+	    seek(MES, $p + length($draft_delimiter), 0);
+	    substr($head, $p + 1) = '';
+	}
+	if ($find{'head'} || $find{'all'}) {
+	    $head =~ s/\n\s+/ /g; # fix continuation lines
+	    $head = mime_decode_string($head);
+	}
+
+	# read $body if necessary
+	#
+	undef $/;
+	if ($find{'body'}) {
+	    $body = <MES>;
+	}
+
+	# construct $all if necessary
+	#
+	if ($find{'all'}) {
+	    $all = $head . ($body ? $body : scalar(<MES>));
+	}
+
+	close(MES);
+
+	if ($eval_string || $dup_check eq 'none') {
+	    if (eval $eval_string) {
+		push(@messages, $m);
+	    }
+	} else {
+	    # check dupulicate message-id
+	    $head =~ m/Message-id:\s*<(.*)>/i;
+	    my $msgid = $1;
+	    $head =~ m/Subject:\s*(.*)/i;
+	    my $subject = $1;
+
+	    if ($dup_check eq "" || $dup_check eq "message-id") {
+		if ($MESSAGE_ID_HASH{$msgid}++) {
+		    push(@messages, $m);
+		}
+	    } elsif ($dup_check eq "message-id+subject") {
+		my $t = join(";", $msgid, $subject);
+		if ($t ne ";" and $MESSAGE_ID_HASH{$t}++) {
+		    push(@messages, $m);
+		}
 	    }
 	}
     }
@@ -283,12 +340,13 @@ sub parse_expression ($$) {
 		 $pattern = $token->[1];
 	     }
 	     $field =~ s/([@\/])/\\$1/g;
-	     $pattern =~ s/([@\/])/\\$1/g;
-		 
+
+	     $pattern = make_japanese_pattern($pattern);
 	     if ($field eq 'body') {
-		 $pattern = make_japanese_pattern($pattern);
+		 $pattern = "." unless $pattern;
 		 $string = "\$$field =~ /$pattern/om$case_flag";
 	     } elsif ($field =~ /^(all|head)$/) {
+		 $pattern = "." unless $pattern;
 		 $string = "\$$field =~ /$pattern/om$case_flag";
 	     } elsif ($field ne '') {
 		 $string = "\$head =~ /^$field:.*$pattern/om$case_flag";
@@ -397,7 +455,7 @@ sub make_japanese_pattern {
 	    # Replace space characters by \s*.  This enables to find
 	    # several word sequence across line boundary.
 	    #
-	    s/./$& =~ m@\s@ ? '\\s*' : quotemeta($&)/eg;
+	    s/(.)/$1 =~ m@\s@ ? '\\s*' : quotemeta($1)/eg;
 	    $result .= $_;
 	}
     }
@@ -407,7 +465,7 @@ sub make_japanese_pattern {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

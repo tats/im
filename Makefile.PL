@@ -2,7 +2,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 ### perl Makefile.PL
 ### make
@@ -33,8 +33,15 @@ if (open(CONFIN, "configure.in")) {
     close(CONFIN);
 }
 
+if ($Config{'osname'} ne 'MSWin32'){
 $prefix = "/usr/local";
 $libdir = "\$exec_prefix/lib";
+} else {
+  $prefix = $Config{'prefix'};
+  $prefix =~ s:\\:/:g;
+  $libdir = $Config{'sitelib'};
+  $libdir =~ s:\\:/:g;
+}
 chomp($im_hostname);
 if ($Config{osname} eq "solaris") {
     $im_usecl='yes';
@@ -97,6 +104,8 @@ foreach (@generate_files) {
     print "Extracting $_ (with variable substitutions)\n";
     while (<IN>) {
 	s/\@prefix\@/$prefix/;	# Config.pm.in
+	s/\@exec_prefix\@/$prefix/;
+	s/\@libdir\@/$libdir/;
 	s/\@im_db_type\@/$im_db_type/;
 	s/\@im_file_attr\@/$im_file_attr/;
 	s/\@im_hostname\@/$im_hostname/;
@@ -117,6 +126,7 @@ WriteMakefile(
     'EXE_FILES' => \@programs_to_install,
     'MAN1PODS' => {},
     'MAN3PODS' => {},
+    'PREFIX' => $prefix,
     'clean' => { FILES => join(' ', '$(EXE_FILES)', 
 			       @pl_files, @generate_files) },
     'dist' => { COMPRESS => 'gzip -9f', SUFFIX => 'gz' }
@@ -126,6 +136,7 @@ WriteMakefile(
 sub MY::postamble {
     my ($self) = shift;
     my (@m);
+    if ($Config{'osname'} ne 'MSWin32'){
     push (@m, qq{
 prefix=$prefix
 exec_prefix=$prefix
@@ -154,10 +165,18 @@ uninstall_config::
 install_rpop: install
 	\$(PERL) -e 'chown(0, (getgrnam("mail"))[2], \@ARGV) and chmod(04555, \@ARGV);' \$(INSTALLSCRIPT)/imget
     });
+  } else {
+    push (@m, qq{
+install:: install_progs
+
+install_progs:
+    \$(CP) Win32\*.exe \$(INSTALLBIN)
+  });
     join "", @m;
+  }
 }
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

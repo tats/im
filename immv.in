@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "immv version 980905(IM100)";
+my $VERSION = "immv version 990905(IM130)";
 
 $Prog = 'immv';
 
@@ -38,7 +38,6 @@ use vars qw($Prog $EXPLANATION @OptConfig
 ##
 
 my %NewMsgCache = ();
-my %ImapHandleCache = ();
 
 $EXPLANATION = "
 $Prog :: Internet Message Move
@@ -88,114 +87,152 @@ exit $EXIT_SUCCESS;
 ##
 sub immv ($$$) {
     my ($src, $dsts, $msgs) = @_;
-    my @msg_paths;
+    my (@imap_dsts, @local_dsts);
+    my ($imap_src, $imap_dst, $news_src, $news_dst) = (0, 0, 0, 0);
 
-    if ($src =~ /^%/o) {
-	require IM::Imap && import IM::Imap;
-	require IM::GetPass && import IM::GetPass;
+    if ($src =~ /^-/) {
+	$news_src = 1;
+    } elsif ($src =~ /^%/) {
+	$imap_src = 1;
     }
-    for (my $i = 0; $i < @{$dsts}; $i++) {
-        if (${$dsts}[$i] =~ /^%/o) {
-	    require IM::Imap && import IM::Imap;	  
-	    require IM::GetPass && import IM::GetPass;
+    foreach (@$dsts) {
+        if (/^-/) {
+	    $news_dst = 1;
+	} elsif (/^%/) {
+	    $imap_dst = 1;
+	    push(@imap_dsts, $_);
+	} else {
+	    push(@local_dsts, $_);
 	}
     }
 
-    chk_folder_existance($src, @{$dsts}); # ignore IMAP folders
+    if ($news_dst) {
+	im_die "refile to News folder is not permitted.\n";
+    }
+
+    if ($news_src) {
+	require IM::Nntp && import IM::Nntp qw(nntp_get_message);
+    }
+
+    if ($imap_src || $imap_dst) {
+	require IM::Imap && import IM::Imap;
+	require IM::GetPass && import IM::GetPass;
+    }
+
+    chk_folder_existance($src, @{$dsts});
 
     $opt_link = 1 if (grep($src eq $_, @{$dsts}));
     @{$dsts} = grep($src ne $_, @{$dsts});
 
-    open_imap_folders(0, $src);
-    open_imap_folders(1, @{$dsts});
+    if (($imap_src && imap_open_folders(0, $src) < 0) ||
+	($imap_dst && imap_open_folders(1, @imap_dsts) < 0))
+    {
+	exit($EXIT_ERROR);
+    }
 
-    if ($src !~ /^%/) {
-	chk_msg_existance($src, @{$msgs});
+    if ($src =~ /^%/) {
+	imap2local($src, \@local_dsts, $msgs) if (scalar(@local_dsts) > 0);
+	imap2imap($src, \@imap_dsts, $msgs) if (scalar(@imap_dsts) > 0);
+    } elsif ($src =~ /^-/) {
+	news2local($src, \@local_dsts, $msgs) if (scalar(@local_dsts) > 0);
+	news2imap($src, \@imap_dsts, $msgs) if (scalar(@imap_dsts) > 0);
     } else {
-	my ($HANDLE, $srcacct, $srcset);
-	my ($getbox, $link) = ('+inbox', 0);
-	my $link_1st;
-
-	$srcacct = imap_folder_acct($src);
-	$HANDLE = $ImapHandleCache{$srcacct};
-	if (imap_select($HANDLE, imap_folder_name($src), 1) < 0) {
-	    im_warn("can't select $src source folder.\n");
-	    close_imap_folders();
-	    exit($EXIT_ERROR);
-	}
-	$srcset = imap_range2set($HANDLE, @{$msgs});
-
-	for (my $i = 0; $i < @{$dsts}; $i++) {
-	    if (imap_folder_acct(${$dsts}[$i]) eq $srcacct) {
-		my $dst = splice(@{$dsts}, $i, 1); $i--;
-		if (imap_copy($HANDLE,
-			      $srcset,
-			      imap_folder_name($dst), 0) < 0) {
-		    im_warn("can't copy to $dst folder.\n");
-		    close_imap_folders();
-		    exit($EXIT_ERROR);
-		}
-	    } elsif (!$link && ${$dsts}[$i] =~ /^\+/) {
-		($getbox, $link) = (splice(@{$dsts}, $i, 1), 1); $i--;
-		($link_1st) = (get_impath($getbox, 'new') =~ m|([^/]+)$|);
-		get_imap_messages($HANDLE, $getbox, @{$msgs});
-	    }
-	}
-	unless (@{$dsts}) {
-	    imap_delete($HANDLE, $srcset) unless ($opt_link);
-	    close_imap_folders();
-	    return 0;
-	}
-
-	unless ($link) {
-	    ($link_1st) = (get_impath($getbox, 'new') =~ m|([^/]+)$|);
-	    get_imap_messages($HANDLE, $getbox, @{$msgs});
-	}
-	imap_delete($HANDLE, $srcset) unless ($opt_link);
-
-	$src = $getbox;
-	$opt_link = $link;
-	$msgs = ["$link_1st-last"];
+	local2local($src, \@local_dsts, $msgs) if (scalar(@local_dsts) > 0);
+	local2imap($src, \@imap_dsts, $msgs) if (scalar(@imap_dsts) > 0);
     }
 
-    @msg_paths = get_impath($src, @{$msgs});
-    foreach (@msg_paths){
-	refile_one($_, $dsts);
+    if ($imap_src || $imap_dst) {
+	imap_close_folders();
     }
-    close_imap_folders();
     return 0;
 }
 
-sub refile_one ($$) {
-    my ($src_path, $dsts) = @_;
-    my ($dst_path, $link_it);
+sub local2local($$$) {
+    my ($src, $dsts, $msgs) = @_;
 
-    foreach (@{$dsts}){
-	unless (/^%/) {
-	    if ($NewMsgCache{$_}){
-		$NewMsgCache{$_} =~ s|([^/]+)$|$1+1|e; # increment cache
-		$dst_path = $NewMsgCache{$_};
+    my @msg_paths = get_impath($src, @$msgs);
+    foreach (@msg_paths) {
+	refile_one($src, $dsts, $_) if (-f $_);
+    }
+}
+
+sub imap2local($$$) {
+    my ($src, $dsts, $msgs) = @_;
+    my ($msg, $Message);
+
+    foreach $msg (@$msgs) {
+	$Message = imap_get_message($src, $msg);
+	refile_one("", $dsts, $Message);
+    }
+    imap_delete_message($src, @$msgs) unless ($opt_link);
+}
+
+sub news2local($$$) {
+    my ($src, $dsts, $msgs) = @_;
+    my ($msg, $rc, $Message);
+
+    foreach $msg (@$msgs) {
+	($rc, $Message) = nntp_get_message($src, $msg);
+	im_die($Message) if ($rc < 0);
+	refile_one("", $dsts, $Message);
+    }
+}
+
+sub refile_one ($$$) {
+    my ($src, $dsts, $msg) = @_;
+    my ($dst, $dst_path, $link_it);
+
+    foreach $dst (@{$dsts}) {
+	if ($NewMsgCache{$dst}){
+	    $NewMsgCache{$dst} =~ s|([^/]+)$|$1+1|e; # increment cache
+	    $dst_path = $NewMsgCache{$dst};
 	    } else {
-		$dst_path = $NewMsgCache{$_} = get_impath($_, 'new');
+		$dst_path = $NewMsgCache{$dst} = get_impath($dst, 'new');
 	    }
-	    if ($opt_link){
-		im_link($src_path, $dst_path) || die $@;      # XXX
-	    } elsif ($link_it){
-		im_link($link_it, $dst_path) || die $@;       # XXX
-	    } else {
-		im_rename($src_path, $dst_path) || die $@;    # XXX
-		$link_it = $dst_path;
-	    }
-	    touch_folder($dst_path) unless ($opt_noharm);
+	if ($opt_link && $src ne "") {
+	    im_link($msg, $dst_path) || die $@;
+	} elsif ($link_it) {
+	    im_link($link_it, $dst_path) || die $@;
 	} else {
-	    my $HANDLE = $ImapHandleCache{imap_folder_acct($_)};
-	    my $idst = imap_folder_name($_);
-	    put_imap_message($HANDLE, $idst, $link_it || $src_path);
+	    if ($src eq "") {
+		if (store_message($msg, $dst, 1) < 0) {
+		    im_warn("can't store msg to $dst folder.\n");
+		}
+	    } else {
+		im_rename($msg, $dst_path) || die $@;
+	    }
+	    $link_it = $dst_path;
+	}
+	touch_folder($dst_path) unless ($opt_noharm);
+    }
+}
+
+sub local2imap ($$$) {
+    my ($src, $dsts, $msgs) = @_;
+    my $msg;
+
+    foreach $msg (@$msgs) {
+	my $src_path = get_impath($src, ($msg));
+	if (-f $src_path) {
+	    imap_put_file($src, $dsts, $src_path);
+	    im_unlink($src_path);
 	}
     }
-    if (!$opt_link && !$link_it) {
-	im_unlink($src_path);
+}
+
+sub news2imap ($$$) {
+    my ($src, $dsts, $msgs) = @_;
+    my ($msg, $rc, $Message);
+
+    foreach $msg (@$msgs) {
+	($rc, $Message) = nntp_get_message($src, $msg);
+	im_die($Message) if ($rc < 0);
+	imap_put_message($Message, $dsts);
     }
+}
+
+sub imap2imap ($$$) {
+    imap_refile(@_);
 }
 
 sub uniq (@) {
@@ -208,115 +245,7 @@ sub uniq (@) {
     return keys(%hash);
 }
 
-##
-## IMAP subroutines
-##
-
-sub get_imap_messages ($$@) {
-    my ($HANDLE, $dst, @ranges) = @_;
-    my @msgs = imap_range2msgs($HANDLE, @ranges);
-
-    if ($msgs[0] < 0) {
-	im_warn("can't find source message(s).\n");
-	close_imap_folders();
-	exit($EXIT_ERROR);
-    }
-    foreach (@msgs) {
-	my ($rc, $msgref) = imap_get($HANDLE, $_);
-	if ($rc < 0) {
-	    im_warn("can't get msg $_ from source folder.\n");
-	    close_imap_folders();
-	    exit($EXIT_ERROR);
-	}
-	local $main::opt_noscan = 1; # for quiet store_message
-	if (store_message($msgref, $dst) < 0) {
-	    im_warn("can't store msg $_ to $dst folder.\n");
-	    close_imap_folders();
-	    exit($EXIT_ERROR);
-	}
-    }
-}
-
-sub put_imap_message ($$$) {
-    my ($HANDLE, $dst, $src_path) = @_;
-    my @Message;
-    local (*SRC);
-
-    unless (open(SRC, "<$src_path")) {
-	im_warn("can't open local message $src_path.\n");
-	close_imap_folders();
-	exit($EXIT_ERROR);
-    }
-    local $_;
-    while (<SRC>) {
-	push(@Message, $_);
-    }
-    if (imap_put($HANDLE, $dst, \@Message) < 0) {
-	im_warn("can't store msg $src_path to $dst folder.\n");
-	close(SRC);
-	close_imap_folders();
-	exit($EXIT_ERROR);
-    }
-    close(SRC);
-}
-
-sub open_imap_folders ($@) {
-    my ($create, @folders) = @_;
-
-    foreach (@folders) {
-	next unless (/^%/);
-	my $acct = imap_folder_acct($_);
-	my $ifld = imap_folder_name($_);
-	my ($rc, $HANDLE);
-
-	unless ($HANDLE = $ImapHandleCache{$acct}) {
-	    my ($pass, $agtfound, $interact) = ('', 0, 0);
-	    my ($dummy, $auth, $user, $host)
-		= imap_spec(imap_folder_regname($_));
-
-	    if (usepwagent()) {
-		$pass = loadpass('imap', $auth, $host, $user);
-		$agtfound = 1 if ($pass ne '');
-	    }
-	    if ($pass eq '' && usepwfiles()) {
-		$pass = findpass('imap', $auth, $host, $user);
-	    }
-	    if ($pass eq '') {
-		$pass = getpass("Password for $acct: ");
-		$interact = 1;
-	    }
-
-	    ($rc, $HANDLE) = imap_open($auth, $host, $user, $pass);
-	    if ($rc < 0) {
-		im_warn("can't open IMAP connection to $host.\n");
-		savepass('imap', $auth, $host, $user, '')
-		    if ($agtfound && usepwagent());
-		close_imap_folders();
-		exit($EXIT_ERROR);
-	    }
-	    savepass('imap', $auth, $host, $user, $pass)
-		if ($interact && $pass ne '' && usepwagent());
-	    $ImapHandleCache{$acct} = $HANDLE;
-	}
-
-	if ((imap_select($HANDLE, $ifld, 1) < 0) && $create) {
-	    if (imap_create_folder($HANDLE, $ifld) < 0) {
-		im_warn("can't create $_ folder.\n");
-		close_imap_folders();
-		exit($EXIT_ERROR);
-	    }
-	}
-    }
-}
-
-sub close_imap_folders () {
-    foreach (keys(%ImapHandleCache)) {
-	imap_close($ImapHandleCache{$_});
-    }
-    %ImapHandleCache = ();
-}
-
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

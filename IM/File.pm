@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Jul  7, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::File.pm version 980905(IM100)";
+my $PM_VERSION = "IM::File.pm version 990905(IM130)";
 
 package IM::File;
 require 5.003;
@@ -172,7 +172,7 @@ sub USE_DB () {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

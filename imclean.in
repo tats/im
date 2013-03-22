@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imclean version 980905(IM100)";
+my $VERSION = "imclean version 990905(IM130)";
 
 $Prog = 'imclean';
 
@@ -99,27 +99,13 @@ sub imclean ($@) {
 	    ($ifld, $auth, $user, $host) = imap_spec($ifld);
 	}
 
-	my $pass = '';
-	my $agtfound = 0;
-	my $interact = 0;
-	if (&usepwagent()) {
-	    $pass = &loadpass('imap', $auth, $host, $user);
-	    $agtfound = 1 if ($pass ne '');
-	}
-	if ($pass eq '' && &usepwfiles()) {
-	    $pass = &findpass('imap', $auth, $host, $user);
-	}
-	if ($pass eq '') {
-	    $pass = &getpass('Password: ');
-	    $interact = 1;
-	}
-
+	my ($pass, $agtfound, $interact) = getpass('imap', $auth, $host, $user);
 	im_warn("accessing IMAP/$auth:$user\@$host\n") if (&verbose);
 
 	(my $rc, $HANDLE) = imap_open($auth, $host, $user, $pass);
 	if ($rc < 0) {
-	    im_warn("IMAP connection was not established.\n")
-		if (&debug('imap') || &verbose);
+	    my $prompt = lc("imap/$auth:$user\@$host");
+	    im_err("invalid password ($prompt).\n");
 	    &savepass('imap', $auth, $host, $user, '')
 		if ($agtfound && &usepwagent());
 	    exit $EXIT_ERROR;
@@ -161,7 +147,7 @@ sub imclean ($@) {
     }
 }
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

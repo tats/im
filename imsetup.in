@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  9, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imsetup version 980905(IM100)";
+my $VERSION = "imsetup version 990905(IM130)";
 
 $Prog = 'imsetup';
 
@@ -23,12 +23,13 @@ $Prog = 'imsetup';
 
 use File::Copy;
 use Sys::Hostname;
-use IM::Config qw(init_opt read_opt help);
+use IM::Config qw(init_opt read_opt read_cfg help);
 use IM::Util;
 use IM::Address qw(extract_addr);
 use integer;
 use strict;
-use vars qw($Prog $EXPLANATION @OptConfig $opt_noharm $opt_help);
+use vars qw($Prog $EXPLANATION @OptConfig
+	    $opt_fromdomain $opt_noharm $opt_help);
 
 ##
 ## Environments
@@ -39,11 +40,16 @@ my $config = "Config";
 my $alias = "Aliases";
 
 my $home = $ENV{'HOME'};
-my $address = im_getlogin() . "\@" . &get_domain_name();
+my $address;
 my $mail = "Mail";
 my $news = "News";
 my $usecl  = "@im_usecl@";
 my $nosync = "@im_nosync@";
+my $src = "local";
+my $auth = "";
+my ($user, $host) = split(/\@/, $address);
+my $keep = 0;
+my $smtpserver = "localhost";
 
 my ($mhdir, $mhalias, $domain, $nntpservers);
 
@@ -55,6 +61,7 @@ Usage :: $Prog [options]
 ";
 
 @OptConfig = (
+    'FromDomain;s;;' => 'Default domain name for mail address.',
     'noharm;b;;' => "Do execute setup, show what will be performed.",
     'help;b;;'   => "Show this message.",
     );
@@ -64,12 +71,19 @@ Usage :: $Prog [options]
 ##
 
 init_opt(\@OptConfig);
+read_cfg();
 read_opt(\@ARGV); # help?
 help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
 
 ##
 ## Main
 ##
+
+if ($opt_fromdomain =~ /\./) {
+    $address = im_getlogin() . "\@" . $opt_fromdomain;
+} else {
+    $address = im_getlogin() . "\@" . get_domain_name();
+}
 
 &read_conf();
 &check_im_directory();
@@ -112,6 +126,39 @@ sub read_conf () {
     } while (! &check_and_create_directory($mynews));
 
     $address = &input_config("What is your E-mail address(es)?", $address);
+
+    do {
+        $src = &input_config("What kind of mail spool do you use? (local/POP/IMAP)", $src);
+    } while (! ($src =~ /^local$|^pop$|^imap$/i));
+  
+    if ($src =~ /^pop|^imap/i) {
+        if ($src =~ /^pop/i) {
+            $auth = "POP";
+            do {
+                $auth = &input_config("What kind of POP authentication mechanism? (POP/APOP/RPOP)", $auth);
+            } while (! ($auth =~ /^pop$|^apop$|^rpop$/i));
+        } else {
+            $auth = "AUTH";
+            do {
+                $auth = &input_config("What kind of IMAP authentication mechanism? (AUTH/LOGIN)", $auth);
+            } while (! ($auth =~ /^auth$|^login$/i));
+        }
+        ($user, $host) = split(/\@/, $address);
+        $host = "mail." . $host;
+        $user = &input_config("What is your $src account name?", $user);
+        $host = &input_config("What is your $src server name or IP address?", $host);
+
+    } 
+
+    if ($src =~ /^pop/i) {
+	$keep = &input_config("Do you want to preserve messages?\n"
+                        . "0 (delete immediately), -1 (preserve forever),\n"
+			. "N > 0 (delete messages after N days) "
+			, $keep);
+    }
+
+    if ($src =~ /^pop|^imap/i) { $smtpserver = $host; }
+    $smtpserver = &input_config("What is your SMTP server name or IP address?", $smtpserver);
 
     $usecl = &input_config("Do you want to use value of Content-Length"
 			   . " header for delimitation for local\nmail?"
@@ -157,15 +204,18 @@ sub scan_mh_conf () {
 	open(MH_PROFILE, $mh_profile);
 	while(<MH_PROFILE>) {
 	    chomp;
-	    if (/^Path:\s*/i) {
-		$mhdir = $mail =  $';
+	    if (/^Path:\s*(.*)/i) {
+		$mhdir = $mail =  $1;
 		$mail =~ s/($home|~)\///;
 	    }
-	    if (/^Aliasfile:\s*/i) {
-		$mhalias = $';
+	    if (/^Aliasfile:\s*(.*)/i) {
+		$mhalias = $1;
 	    }
-	    if (/^Alternate-Mailboxes:\s*/i) {
-		$address = $';
+	    if (!$mhalias && /^ali:\s*-alias\s*(.*)/i) {
+		$mhalias = $1;
+	    }
+	    if (/^Alternate-Mailboxes:\s*(.*)/i) {
+		$address = $1;
 	    }
 	}
     } else {
@@ -212,6 +262,10 @@ sub copy_alias_file () {
     my $im_alias = "$home/$imdir/$alias";
     my $mh_alias = "$home/$mhdir/$mhalias";
 
+    if ( ! -f $mh_alias ) {
+	$mh_alias = $mhalias;
+    }
+
     if ( -f $mh_alias && ! -f $im_alias ) {
 	print "Copy $mh_alias to $im_alias.\n";
 	if (!$opt_noharm) {
@@ -233,8 +287,9 @@ sub make_conf_file () {
     print "Setup $im_config.\n";
     if (!$opt_noharm) {
 	my $a = extract_addr($address);
-	$a =~ /\@/;
-	$domain = $';
+	if ($a =~ /\@(.*)/) {
+	    $domain = $1;
+	}
 	$nntpservers = $ENV{'NNTPSERVER'} || "localhost";
 	open(CONFIG, ">$im_config");
 	print CONFIG <<"---";
@@ -270,6 +325,7 @@ Address=$address
 FromDomain=$domain
 ToDomain=$domain
 #Name=Full Name			# commentary name for my mail address
+				# should not contain 8bit characters
 #AddrRegex=
 #Org=The Mew Organization	# for news posting
 #User=user_name
@@ -302,6 +358,8 @@ NewsDir=$news			# for saved news
 ## Default settings
 ##
 
+## Address Book
+#AddrBookFile=Addrbook		# relative to ~/.im/
 ## Mail address aliases
 #AliasesFile=Aliases		# relative to ~/.im/
 ## PetName: mail address aliases for displaying
@@ -312,6 +370,7 @@ NewsDir=$news			# for saved news
 #MsgDBType=DB			# type of database (DB, NDBM, SDBM)
 
 ## To call user defined subroutines (relative to ~/.im/)
+#GetChkSbr=getchk.sbr		# hooks for imget
 #GetSbr=get.sbr			# hooks for imget
 #ScanSbr=scan.sbr		# hooks for imget/imls
 
@@ -321,44 +380,74 @@ NewsDir=$news			# for saved news
 
 ## imget/imls specific
 #ScanSbr=scan.sbr		# hook for special processing (rel. to ~/.im/)
-#Form=%+5n %m%d %-14A %-18S %b	# default format for scanning
+#Form=%+5n %m%d %-14A %S || %b	# default format for scanning
 #AllowCRLF=no			# saved messages may contain CRLF (DOS style)
 #Width=80			# default width for scanning
 #JisSafe=on			# escape seq. of JIS char. should be managed
 #Indent=2			# indent step for threading
 
 ## Servers
+Smtpservers=$smtpserver
 #Smtpservers=localhost		# default server for SMTP
 #EmgSmtpSvrs=12.34.56.78,localhost	# SMTP server just for error return
 #NntpServers=localhost		# default server for NNTP
 
 ## imget specific
 #GetSbr=get.sbr			# hook for special processing (rel. to ~/.im/)
+---
+
+        if ($src =~ /^local/i ) {
+            print CONFIG <<"---";
+Imget.Src=local
+keep=$keep
+---
+        }
+        print CONFIG <<"---";
 #Imget.Src=local		# default source of imget (local mailbox)
 #lock=flock			# locking style of local mailbox
 #rpath=append			# conversion of UNIX From into Return-Path:
-#PopHistory=pophist		# to save last state (relative to ~/.im/)
+#PopHistory=pophist-{POPSERVERID}	# to save last state (relative to ~/.im/)
 #NntpHistory=newshist		# to save last state (relative to ~/.im/)
 #MBoxStyle=qmail		# if folder style mbox of qmail is used
 #Imget.Src=local:\${HOME}/MailDir# in case of qmail
 UseCL=$usecl			# Use value of Content-Length header
 NoSync=$nosync			# Do not need fsync(2) on writing file
 
+---
+        if ($src =~ /^pop/i) {
+            print CONFIG <<"---";
+Imget.Src=pop
+PopAccount=/$auth:$user\@$host
+keep=$keep
+---
+        }
+        print CONFIG <<"---";
+#Imget.Src=pop
 #PopAccount=/APOP\@localhost	# account info for POP access
-#PopAccount=user/APOP\@host	# account info with user name
-#PopAccount=user/APOP\@host/110	# account info with user name and port number
-#Keep=7		 		# preserve read messages on server
+#PopAccount=/APOP:user\@host	# account info with user name
+#PopAccount=/APOP:user\@host/110	# account info with user name and port number
+#Keep=7				# preserve read messages on server
 #ProtoKeep=UIDL			# how to know which message is unread
 				# (UIDL, LAST, STATUS, MSGID)
 #IgnorePostPet=yes		# leave messages for PostPet on mbox (POP only)
 
+---
+        if ($src =~ /^imap/i) {
+            print CONFIG <<"---";
+Imget.Src=imap
+ImapAccount=/$auth:$user\@$host
+keep=$keep
+---
+        }
+        print CONFIG <<"---";
+#Imget.Src=imap
 #ImapAccount=/AUTH\@localhost	# account info for IMAP access
-#ImapAccount=user/AUTH\@host	# account info with user name
+#ImapAccount=/AUTH:user\@host	# account info with user name
 #HttpProxy=proxy-server:8080	# proxy server for HTTP access
 #NoProxy=http://.*my.domain/	# URL regex not to use Proxy server
 #UsePwAgent=yes			# use password agent
 #PwAgentPort=6543		# Port to connect pwagent with TCP/IP
-                                # (Insecure for multi-user system!)
+				# (Insecure for multi-user system!)
 				# 0 to use UNIX domain socket (more secure)
 
 # be careful on security if you wish to use PwFiles!
@@ -408,7 +497,7 @@ NoSync=$nosync			# Do not need fsync(2) on writing file
     }
 }
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

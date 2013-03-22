@@ -1,5 +1,5 @@
---- configure.in.orig	Mon Aug 31 16:08:30 1998
-+++ configure.in	Wed Sep  2 10:43:50 1998
+--- configure.in.orig	Thu Sep  3 00:24:36 1998
++++ configure.in	Mon Sep  7 13:38:32 1998
 @@ -13,7 +13,7 @@
  AC_CANONICAL_HOST
  AC_PROG_CPP
@@ -9,7 +9,16 @@
  im_nosync="no"
  
  AC_SUBST(im_rpop)
-@@ -124,6 +131,7 @@
+@@ -24,7 +24,7 @@
+ AC_SUBST(im_usecl)
+ AC_SUBST(im_nosync)
+ AC_SUBST(im_hostname)
+-IM_PATH_PERLV_PROGS(im_path_perl, perl perl5, PERL5_NOT_FOUND)
++IM_PATH_PERLV_PROGS(im_path_perl, perl perl5 perl.exe perl5.exe, PERL5_NOT_FOUND)
+ case "$im_path_perl" in
+ ""|PERL5_NOT_FOUND)
+    echo "fatal error: perl 5.004 not found. install perl 5.004 or later." 1>&2
+@@ -100,6 +100,7 @@
  	Makefile:Makefile.in \
  	cnf.im/SiteConfig:cnf.im/SiteConfig.in \
  	IM/Config.pm:IM/Config.pm.in \

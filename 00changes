@@ -1,3 +1,306 @@
+130 (99/09/05) mew-release release
+
+* Only version change for stable release.
+
+127 (99/09/03) mew-dist release
+
+* NNTPauthuser.
+	Koga Youichirou <y-koga@isoternet.org>
+
+126 (99/08/26) mew-dist release
+
+* Removing local messages when immv and imrm are used for IMAP.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* Imap auth separator was changed from '/' to '//'.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+
+125 (99/08/23) mew-dist release
+
+* Removing $`, $&, and $'.
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+* Syncing imsetup, SiteConfig, and Config.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+
+124 (99/08/20) mew-dist release
+
+* Several bug fixes for Imap.pm.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+* A bug fix for conv_euc_from_sjis.
+* Removing conftest.c.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* Sync hacks.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* Appending sever-id to PopHistory.
+	Shuichi KITAGUCHI <kit@Mew.org>
+
+123 (99/08/18) mew-dist release
+
+* fsync() hack.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* NNTP vs password.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* CDP: for imput.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* Flush STDERR after getting password.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+* A patch to parse the assoc option.
+
+122 (99/08/18) mew-dist release
+
+* Allowing user commands in Scan form.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>	
+* The boundary option for imcat.
+* invalid password for xxx -> invalid password (xxx)
+  To allow SPCs in proto/auth:user@host.
+* A bug fix for imls's grep.
+
+121 (99/08/16) mew-dist release
+
+* Duplicate check in imgrep.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>	
+* ScanHeaderPick.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>	
+* A patch for the --scaninboxonly.
+	OHARA Shigeki <os@iij.ad.jp>
+* Two patches for Imap.pm.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+
+120 (99/08/16) mew-dist release
+
+* start/stop for impwagent.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* getpass displays proto/auth:user@host.
+* A bug fix for inbox_folder().
+
+119 (99/08/13) mew-dist release
+
+* Case's inbox should become Imget.Dst.
+* Making cases case-sensitive.
+* Fixed imsort's Y2K problem.
+	Masaki KONUMA <konuma@de.mtex.co.jp>
+* Brush up the IMAP completion.
+	Motonori NAKAMURA <motonori@media.kyoto-u.ac.jp>
+* A typo fix in Config.pm.
+	Kenichi Nabeya <nabeken@hal.com>
+
+118 (99/07/31) mew-dist release
+
+* Alias vs Addrbook hack.
+* Fixes for IMAP.
+	Yoshiki Hayashi <t90553@mail.ecc.u-tokyo.ac.jp>
+* Continuous lines for Petname in Addrbook.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* Comment out thread stuff in Imap.pm, anyway.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>	
+* Don't clear password in impwagent when connection is not established.
+	TAKAHASHI Masafumi <mta@kt.rim.or.jp>
+* binmode for imls.
+	Shuichi KITAGUCHI <kit@Mew.org>
+
+117 (99/06/23) mew-dist release
+
+* Removing Notes domain for Nickname.
+	Shun-ichi TAHARA <jado@fsinet.or.jp>
+* Addrbook hack. (Only for Japanese, sigh.)
+* A thread patch preferring In-Reply-To: to References:.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+* A patch for Makefile.PL.
+	Shuichi KITAGUCHI <kit@Mew.org>
+* A timezone patch.
+	"Hideaki YOSHIFUJI" <yoshfuji@ecei.tohoku.ac.jp>
+
+116 (99/06/04) mew-dist release
+
+* Enabling specification of POP/IMAP/SMTP Server by imsetup.
+	Teruyuki Morimura <terubou@sandalwood.net>
+* A bug fix for quote vs. RFC2047.
+	SAKAI Kiyotaka <ksakai@kso.netwk.ntt-at.co.jp>
+* Copying domain name from SiteConfig by imsetup.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Insecure hack.
+	Motonori NAKAMURA <motonori@media.kyoto-u.ac.jp>
+* Resent hack.
+	Motonori NAKAMURA <motonori@media.kyoto-u.ac.jp>
+
+115 (99/04/25) mew-dist release
+
+* Allowing SPC in folder names.
+	miz@qb3.so-net.ne.jp
+* A patch for Japanese folders.
+	kyota@po.ntts.co.jp (Kyotaro HORIGUCHI)
+* Refiling NetNes articles.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* A warning message for Virtual mode.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+
+114 (99/04/05) mew-dist release
+
+* One more namazu patch.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+* Noscan hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* PopHistory=ph-{POPSERVERID}
+	Motonori NAKAMURA <motonori@media.kyoto-u.ac.jp>
+* Directory check hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Bug fixes for immv.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+113 (99/04/01) mew-dist release
+
+* IMAP and NetNews hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Japanese.pm hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* 0 padding message.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* namazu patch.
+	Hideyuki SHIRAI <shirai@rdmg.mgcs.mei.co.jp>
+
+112 (99/03/29) mew-dist release
+
+* Petname existence.
+	FUJIE Masanori <fujie@iij.ad.jp>
+* Miscellaneous patches.
+	Motonori NAKAMURA <motonori@econ.kyoto-u.ac.jp>
+* Multiple folder hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Supporting messages start with "0".
+	Murata Takashi <Takashi.Murata@nsgnet.co.jp>
+* message_list stuff.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* A bug fix for Addrbook.
+	"YAMAGUCHI, Shuhei" <yamagus@alpha.co.jp>
+
+111 (99/03/23) mew-dist release
+
+* Addrbook support. Only for nickname. Not support aliases.
+* Numeric folder hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+110 (99/03/09) mew-dist release
+
+* Charset handling: (GB2312, CN-GB), (Big5, CN-Big5), and HZ-GB-2312.
+* Conversion from Big5 to Mule's ctext.
+* Conversion from KOI8-R to ctext.
+* A buf fix for the use primitive.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* A bug fix for folding.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+109 (99/03/02) mew-dist release
+
+* imsetup hack to copy fullpath aliases.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Merging Header.pm into Message.pm.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Removing unnecessary code of config_cases.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* The default of Form is now "%+5n %m%d %-14A %S || %b".
+  This is because the beginning of the body doesn't contain useful
+  information in many cases. Moreover, imls can't decode MIME-encoded
+  body currently.
+
+108 (99/02/27) mew-dist release
+
+* impath --path displays ConfigCaseInbox for Mew.
+* Introducing the 'use' primitive.
+	Makoto MATSUSHITA <matusita@ics.es.osaka-u.ac.jp>
+* imls warns if characters in Scan form after %n is not either a space,
+  %D, %p, %M.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Comments for Config.pm and syncing imsetup with dot.im/Config.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+107 (99/02/25 Happy Birthday!) mew-dist release
+
+* Convert tis-620 to ctext.
+* Obsolete address syntax support.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Destination and annotation hack.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Range vs drive separator (i.e. ":") conflict hack.
+	Yoshiaki Kasahara <kasahara@nc.kyushu-u.ac.jp>
+* Skip "foo*0*" style parameter in Scan.pm.
+
+106 (99/02/12) mew-dist release
+
+* the src option of imget is fixed to pop[/auth][:user][@server[/port]].
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* imsort treats Date: without timezone as GMT.
+	Yoshinari NOMURA <nom@csce.kyushu-u.ac.jp>
+* flock fix for Win95.
+	Shuichi Kitaguchi <shuuic-k@is.aist-nara.ac.jp>
+
+105 (99/02/08) mew-dist release
+
+* qmail "cur" support.
+	Hiroki Nakano <cas@trans-nt.com>
+* A fix for imsort.
+	kyota@po.ntts.co.jp
+* Nntp.px fix to allow selected.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Nntp.pm fix to specify port.
+	Naoki ESAKA <naoki-e@is.aist-nara.ac.jp>
+* $& fix for Grep.pm.
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+* Bcc/Dcc fix.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* Null pattern handing for Grep.pm.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+* Message-ID: check for annotation.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* A bug fix for mimedecodequoted
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+
+104 (98/11/24) mew-dist release
+
+* The mimedecodequoted option.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* Removing srcdir from Makefile.in.
+	Masashi Fujita <objectx@bandit.co.jp>
+* Requires MsgStore.pm in Nntp.pm.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* The "@" fix for Grep.pm
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* dig_dir hack for msdos file system.
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+
+103 (98/11/04) mew-dist release
+
+* -o is equal to --scaninboxonly of imput.
+* Bug fix for regex creation of Address.
+* Grep.pm fixes.
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+
+102 (98/10/19) mew-dist release
+
+* "default" label can be also *comma-separated*.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* --scaninboxonly for imget.
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* NNTP vs auth patch.
+	Maybe TABOO <y-koga@ccs.mt.nec.co.jp>
+* O_XXX -> O_XXX().
+* imgrep patch.
+	Kazumasa Utashiro <utashiro@iij.ad.jp>
+
+101 (98/09/23) mew-dist release
+
+* message/partial fixes.
+	OBATA Noboru <obata@nippon-control-system.co.jp>
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+	Hideyuki SHIRAI <Shirai@rdmg.mgcs.mei.co.jp>
+* umask hack.
+	SAKAI Kiyotaka <ksakai@netwk.ntt-at.co.jp>
+* imhsync
+	Motonori Nakamura <motonori@econ.kyoto-u.ac.jp>
+* OS2 update
+	OKUNISHI Fujikazu <fuji0924@mbox.kyoto-inet.or.jp>	
+
 100 (98/09/05) mew-release release (for Mew 1.93 stable)
 
 * config.guess hack for NEC.

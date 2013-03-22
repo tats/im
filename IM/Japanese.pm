@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Japanese.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Japanese.pm version 990905(IM130)";
 
 package IM::Japanese;
 require 5.003;
@@ -20,13 +20,20 @@ use strict;
 use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter);
 @EXPORT = qw(code_check code_check_body
-	     convert_iso2022jp_body conv_iso2022jp);
+	     convert_iso2022jp_body conv_iso2022jp
+	     conv_euc_from_jis conv_euc_from_sjis);
 
 =head1 NAME
 
 Japanese - IM Japanese handler
 
 =head1 SYNOPSIS
+
+  use IM::Japanese;
+  $code = code_check($line, $use_hankaku_kana);
+  $code = code_check_body($content);
+  convert_iso2022jp_body($content, $code);
+  $converted = conv_iso2022jp($line, $code);
 
 =head1 DESCRIPTION
 
@@ -37,8 +44,8 @@ use vars qw($C_jis $C_jis_roman $C_sjis $C_sjis_kana
 	    $C_pascii $C_tascii $C_sascii $C_8bit
 	    $E_jp $E_asc $E_kana);
 BEGIN {
-    $C_jis       = '\e\$[@B]([\x21-\x7e][\x21-\x7e])+';
-    $C_jis_roman = '\e\([BJ][\s\x21-\x7e]*';
+    $C_jis       = '(\e\$[\@B])([\x21-\x7e]+)';
+    $C_jis_roman = '(\e\([BJ])([\s\x21-\x7e]*)';
     $C_sjis      = '[\x81-\x9f\xe0-\xfc][\x40-\x7e\x80-\xfc]';
     $C_sjis_kana = '[\xa1-\xdf]';
     $C_euc       = '[\xa1-\xfe][\xa1-\xfe]';
@@ -57,7 +64,9 @@ BEGIN {
 
 ##### CODE CHECKER #####
 #
-# code_check($line, $use_hankaku_kana)
+# code_check(line, use_hankaku_kana)
+#	line: a line of string to be checked
+#	use_hankaku_kana: bool value if check hankaku kana
 #	return value: encoding type
 #		ascii
 #		8bit
@@ -157,7 +166,7 @@ sub code_check_body ($) {
 
 ##### CONVERT BODY INTO ISO-2022-JP ENCODING #####
 #
-# convert_iso2022jp_body(content)
+# convert_iso2022jp_body(content, code)
 #	content: pointer to body content line list
 #	code: input kanji code
 #	return value: none
@@ -173,30 +182,29 @@ sub convert_iso2022jp_body ($$) {
 
 ##### ISO-2022-JP CODE CONVERSION #####
 #
-# conv_iso2022jp(line)
+# conv_iso2022jp(line, code)
 #	line: a line of string to be converted
 #	code: input kanji code
 #	return value: converted line
 #
 sub conv_iso2022jp ($;$) {
     my ($line, $code) = @_;
-    
+
     im_debug("conv_iso2022jp: $line\n") if (&debug('japanese'));
+
+    unless ($line =~ /[\x80-\xff]/) {
+	im_debug("source is ascii or jis\n") if (&debug('japanese'));
+	return $line;
+    }
 
     if ($code eq 'NoHankana') {
 	$code = uc(code_check($line, 1));
-    } elsif (! defined($code)) {
+    } elsif (!defined($code)) {
 	$code = uc(code_check($line));
     }
     $code = uc($main::Default_code) if ($code eq 'SORE');
 
-    if ($code eq 'ASCII') {
-	im_debug("source is ascii\n") if (&debug('japanese'));
-	return $line;
-    } elsif ($code eq 'JIS') {
-	im_debug("source is jis\n") if (&debug("japanese"));
-	return $line;
-    } elsif ($code eq 'EUC') {
+    if ($code eq 'EUC') {
 	im_debug("source is euc\n") if (&debug('japanese'));
 	return &conv_from_euc($line);
     } elsif ($code eq 'SJIS') {
@@ -215,32 +223,14 @@ sub conv_iso2022jp ($;$) {
 #
 sub conv_from_sjis ($) {
     my $line = shift;
-    $line =~ s/(($C_sjis)+|($C_sjis_kana)+)/s2j($&, $')/geo;
+    $line =~ s/((?:$C_sjis|$C_sjis_kana)+)/sjis2jis($1)/geo;
     return $line;
 }
-
-# s2e() is taken from jcode.pl-1.9/2.3 by utashiro@iij.ad.jp
-######################################################################
-#
-# jcode.pl: Perl library for Japanese character code conversion
-#
-# Copyright (c) 1995,1996,1997 Kazumasa Utashiro <utashiro@iij.ad.jp>
-# Internet Initiative Japan Inc.
-# 1-4 Sanban-cho, Chiyoda-ku, Tokyo 102, Japan
-#
-# Copyright (c) 1992,1993,1994 Kazumasa Utashiro
-# Software Research Associates, Inc.
-#
-# Original version was developed under the name of srekcah@sra.co.jp
-# February 1992 and it was called kconv.pl at the beginning.  This
-# address was a pen name for group of individuals and it is no longer
-# valid.
-#
-# Use and redistribution for any purpose, without significant
-# modification, is granted as long as all copyright notices are
-# retained.  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND
-# ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.
-######################################################################
+sub sjis2jis ($) {
+    my $line = shift;
+    $line =~ s/((?:$C_sjis)+|(?:$C_sjis_kana)+)/s2j($1)/geo;
+    return "$line$E_asc";
+}
 sub s2e ($) {
     my $code = shift;
     my ($c1, $c2) = unpack('CC', $code);
@@ -256,18 +246,15 @@ sub s2e ($) {
     }
     return pack('CC', $c1, $c2);
 }
-# s2j() is based on _sjis2jis() of jcode.pl-1.9/2.0 by utashiro@iij.ad.jp
-sub s2j ($$) {
-    my ($cur, $rest) = @_;
-    if ($cur =~ /^($C_sjis_kana+)/o) {
+sub s2j ($) {
+    my $cur = shift;
+    if ($cur =~ /^$C_sjis_kana/o) {
 	$cur =~ tr/\xa1-\xdf/\x21-\x5f/;
-	return "$E_kana$cur" if ($rest =~ /^($C_sjis|$C_sjis_kana)/o);
-	return "$E_kana$cur$E_asc";
+	return "$E_kana$cur";
     } else {
 	$cur =~ s/(..)/s2e($1)/ge;
 	$cur =~ tr/\xa1-\xfe/\x21-\x7e/;
-	return "$E_jp$cur" if ($rest =~ /^($C_sjis|$C_sjis_kana)/o);
-	return "$E_jp$cur$E_asc";
+	return "$E_jp$cur";
     }
 }
 
@@ -279,26 +266,63 @@ sub s2j ($$) {
 #
 sub conv_from_euc ($) {
     my $line = shift;
-    $line =~ s/(($C_euc)+|($C_euc_kana)+)/e2j($&, $')/geo;
+    $line =~ s/((?:$C_euc|$C_euc_kana)+)/euc2jis($1)/geo;
     return $line;
 }
-# e2j() is based on _euc2jis() of jcode.pl-1.9/2.0 by utashiro@iij.ad.jp
-sub e2j ($$) {
-    my ($cur, $rest) = @_;
+sub euc2jis ($) {
+    my $line = shift;
+    $line =~ s/((?:$C_euc)+|(?:$C_euc_kana)+)/e2j($1)/geo;
+    return "$line$E_asc";
+}
+sub e2j ($) {
+    my $cur = shift;
     $cur =~ tr/\xa1-\xfe/\x21-\x7e/;
-    if ($cur =~ /\x8e/) {
-	$cur =~ tr/\x8e//d;
-	return "$E_kana$cur" if ($rest =~ /^($C_euc|$C_euc_kana)/o);
-	return "$E_kana$cur$E_asc";
+    if ($cur =~ tr/\x8e//d) {
+	return "$E_kana$cur";
     } else {
-	return "$E_jp$cur" if ($rest =~ /^($C_euc|$C_euc_kana)/o);
-	return "$E_jp$cur$E_asc";
+	return "$E_jp$cur";
     }
+}
+
+##### EUC CODE CONVERSION FROM SJIS #####
+#
+# conv_euc_from_sjis(line)
+#	line: a line of string to be converted
+#	return value: converted line
+#
+
+sub conv_euc_from_sjis ($) {
+    my $line = shift;
+    $line =~ s/($C_sjis|$C_sjis_kana)/s2e($1)/geo;  
+    return $line;
+}
+
+##### EUC CODE CONVERSION FROM JIS #####
+#
+# conv_euc_from_jis(line)
+#	line: a line of string to be converted
+#	return value: converted line
+#
+
+sub conv_euc_from_jis ($) {
+    my $line = shift;
+    $line =~ s/$C_jis/j2e($1,$2)/geo;
+    $line =~ s/\e\$C_jis_roman/$2/geo;
+    return $line;
+}
+
+sub j2e ($$) {
+    my $esc = shift;
+    my $line = shift;
+    if ($esc =~ /\e\$[\@B]/) {
+       $line =~ tr/\x21-\x7e/\xa1-\xfe/;
+    }
+    return $line;
 }
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

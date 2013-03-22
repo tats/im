@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Dec 31, 1995
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imls version 980905(IM100)";
+my $VERSION = "imls version 990905(IM130)";
 
 $Prog = 'imls';
 
@@ -29,7 +29,7 @@ use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
 	    @servers
 	    $opt_form $opt_jissafe $opt_width $opt_thread @opt_src
-	    $opt_indent $opt_grep $opt_delimiter $opt_casefold
+	    $opt_indent $opt_grep $opt_namazu $opt_delimiter $opt_casefold
 	    $opt_verbose $opt_debug $opt_quiet $opt_help $opt_buffer);
 
 ##
@@ -64,10 +64,12 @@ Usage :: $Prog [options] [+folder] [range]
     'thread;b;;'  => 'Make threads',
     'indent;i;;'  => "Width of thread indent",
     'grep;s;;'    => "Grep pattern for vscan",
+    'namazu;b;;'  => "Use namazu for vscan",
     'casefold;b;on;' => 'Case sensitivity'.
 	"\n\t\t(This option affects both fieldname and pattern.)",
     'delimiter;s;\n\n|\n----\n;' => 'Mail header delimiter',
     'dupchecktarget,D;s;;'    => 'Duplicate Check Target',
+    'mimedecodequoted,x;b;;' => 'Decode broken mime-encoded strings',
     'quiet;b;;'   => 'Suppress informational messages.',
     'verbose;b;;' => 'With verbose messages.',
     'debug;d;;'   => "With debug message.",
@@ -89,8 +91,7 @@ debug_option($opt_debug) if $opt_debug;
 ## Main
 ##
 
-my $petnamefile = &petname_file();
-&read_petnames($petnamefile) if $petnamefile;
+&read_petnames();
 
 &set_scan_form($opt_form, $opt_width, $opt_jissafe);
 
@@ -102,7 +103,14 @@ if (scalar(@opt_src) < 1) {
 } elsif ($opt_grep) {
     require IM::Folder && import IM::Folder;
     require IM::Grep && import IM::Grep;
-    &vscan();
+    if ($opt_namazu){
+	&vscan_namazu(@ARGV);
+    } else {
+	&vscan();
+    }
+    if ($scan_count == 0) {
+	im_warn("no messages.\n");
+    }
     exit $EXIT_SUCCESS;
 } else {
     if (scalar(@opt_src) != 1) {
@@ -356,7 +364,6 @@ sub vscan () {
 
     $eval_string = parse_expression($opt_grep, $opt_casefold);
 
-    binmode(STDOUT);
     foreach (@opt_src) {
 	my ($folder, $ranges) = (/([^:]+)(?::)?(.*)?/);
 	my $folder_dir;
@@ -372,13 +379,49 @@ sub vscan () {
 
 	$folder_dir = expand_path($folder);
 
-	@messages = grep_folder($folder_dir, $eval_string, @ranges);
+	@messages = grep_folder($folder_dir, $eval_string, 'none', @ranges);
 	foreach ( @messages ) {
 	    if ( -f "$folder_dir/$_" ) {
 		my %Head = &get_header("$folder_dir/$_");
 		$Head{'pnum'} = $Head{'number:'};
 		$Head{'number:'} = $num;
 		disp_msg(\%Head, $opt_grep);
+  		$num++;
+	    }
+	}
+    }
+    $scan_count = $num - 1;
+}
+
+
+###
+### vscan_namazu
+###
+sub vscan_namazu (@) {
+    my $num = shift;
+    my $nmzidx;
+
+    $num = 1 if($num eq 'all');
+
+    binmode(STDOUT);
+    foreach (@opt_src) {
+	my $nmzidx = $_;
+	my @messages = ();
+
+	open( NMZ, "namazu -aeS \"$opt_grep\" $nmzidx|") 
+	    || im_err( "namazu error\n");
+	@messages = sort {$a <=> $b} <NMZ>;
+	close( NMZ );
+
+	foreach ( @messages ) {
+	    chop;
+	    s/^\/([a-zA-Z])\|/\1:/;
+	    if ( -f $_ ) {
+		my %Head = &get_header($_);
+		$Head{'pnum'} = $Head{'number:'};
+		$Head{'number:'} = $num;
+		disp_msg(\%Head, $opt_grep);
+		$scan_count++;
   		$num++;
 	    }
 	}
@@ -478,27 +521,13 @@ sub imap_messages ($@) {
 	($folder, $auth, $user, $host) = imap_spec($folder);
     }
 
-    my $pass = '';
-    my $agtfound = 0;
-    my $interact = 0;
-    if (&usepwagent()) {
-	$pass = &loadpass('imap', $auth, $host, $user);
-	$agtfound = 1 if ($pass ne '');
-    }
-    if ($pass eq '' && &usepwfiles()) {
-	$pass = &findpass('imap', $auth, $host, $user);
-    }
-    if ($pass eq '') {
-	$pass = &getpass('Password: ');
-	$interact = 1;
-    }
-
-#   im_warn("accessing IMAP/$auth:$user\@$host\n") if (&verbose);
+    my ($pass, $agtfound, $interact) = getpass('imap', $auth, $host, $user);
+    im_warn("accessing IMAP/$auth:$user\@$host\n") if (&verbose);
 
     my ($rc, $HANDLE) = &imap_open($auth, $host, $user, $pass);
     if ($rc < 0) {
-#	im_warn("IMAP connection was not established.\n")
-#	  if (&debug("imap") || &verbose);
+	my $prompt = lc("imap/$auth:$user\@$host");
+	im_err("invalid password ($prompt).\n");
 	&savepass('imap', $auth, $host, $user, '')
 	    if ($agtfound && &usepwagent());
 	$scan_count = -1;
@@ -550,7 +579,7 @@ sub uniq (@) {
 ## End of imls
 ##
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Smtp.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Smtp.pm version 990905(IM130)";
 
 package IM::Smtp;
 require 5.003;
@@ -174,14 +174,19 @@ sub smtp_transaction ($$$$$$) {
 #
 sub smtp_transact_sub ($$$$$$) {
     my ($servers, $Header, $Body, $bcc, $part, $total) = @_;
-    my ($i, $rc, $fail, @fatal, $msg_size);
+    my ($i, $rc, $fail, @fatal, $msg_size, $btype);
     return $rc if ($rc = &smtp_open($servers, 1));
+    if ($ESMTP{'8BITMIME'} && $main::Has_8bit_body && !$main::do_conv_8to7) {
+        $btype = ' BODY=8BIT';
+    } else {
+        $btype = '';
+    }
     if ($ESMTP{'SIZE'}) {
 	$msg_size = &message_size($Header, $Body, $part);
 	$rc = &tcp_command(\*SMTPd,
-	  "MAIL FROM:<$main::Sender> SIZE=$msg_size", '');
+	  "MAIL FROM:<$main::Sender> SIZE=$msg_size$btype", '');
     } else {
-	$rc = &tcp_command(\*SMTPd, "MAIL FROM:<$main::Sender>", '');
+	$rc = &tcp_command(\*SMTPd, "MAIL FROM:<$main::Sender>$btype", '');
     }
     return $rc if ($rc);
     $fail = 0;
@@ -283,7 +288,7 @@ sub smtp_transaction_for_error_notify ($$$) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

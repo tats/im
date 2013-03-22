@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imali version 980905(IM100)";
+my $VERSION = "imali version 990905(IM130)";
 
 $Prog = 'imali';
 
@@ -27,7 +27,8 @@ use IM::Alias;
 use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
-	    $opt_host $opt_file $opt_verbose $opt_debug $opt_help);
+	    $opt_host $opt_file $opt_addrbook
+	    $opt_verbose $opt_debug $opt_help);
 
 ##
 ## Environments
@@ -43,6 +44,7 @@ Usage: $Prog [options] [target...]
 @OptConfig = (
     'host,H;b;;'  => "Lookup hosts alias file.",
     'file;s;;'    => "Set aliases file.",
+    'addrbook;s;;'    => "Set Addrbook file.",
     'verbose;b;;' => 'With verbose messages.',
     'debug;d;;'   => "With debug message.",
     'help;b;;'    => "Show this message.",
@@ -67,7 +69,7 @@ debug_option($opt_debug) if $opt_debug;
 my @targets = @ARGV;
 
 if (! $opt_host) {
-    alias_read(($opt_file && expand_path($opt_file)) || aliases_file());
+    alias_read($opt_file, $opt_addrbook);
     if (scalar(@targets) == 0) {
 	alias_print();
     } else {
@@ -141,7 +143,7 @@ Print a usage message on standard output and exit successfully.
 
 =cut
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

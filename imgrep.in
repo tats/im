@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imgrep version 980905(IM100)";
+my $VERSION = "imgrep version 990905(IM130)";
 
 $Prog = 'imgrep';
 
@@ -29,7 +29,7 @@ use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @OptConfig
 	    $opt_format @opt_src $opt_casefold $opt_expression
-	    $opt_delimiter $opt_verbose $opt_debug
+	    $opt_delimiter $opt_dupchecktarget $opt_verbose $opt_debug
 	    $opt_quiet $opt_help);
 
 ##
@@ -47,6 +47,7 @@ my $eval_string = '';		# store search engine
 # regexp for range syntax (sequence not supported)
 my $range_element = '(\\d+|cur|first|last|next|prev|new)';
 my $range_regexp = "($range_element(-$range_element|:[+-]?\\d+)?|all)";
+my $ranges_regexp = "$range_regexp(,$range_regexp)?";
 
 $EXPLANATION = "
 $Prog :: Internet Message GREP
@@ -75,6 +76,7 @@ Usage :: $Prog [options] [+folder] [range]
         "\n\t\t\tbody	     Entire body".
         "\n\t\t\tall	     Entire message",
     'delimiter;s;\n\n|\n----\n;' => 'Mail header delimiter',
+    'dupchecktarget,D;s;none;' => 'Duplicate Check Target',
     'quiet;b;;'   => 'Suppress informational messages.',
     'verbose;b;;' => 'With diagnostic messages.',
     'debug;d;;'   => 'With debug messages.',
@@ -124,7 +126,8 @@ my $matched = 0;
 
  FOLDER:
     foreach (@opt_src) {
-	my ($folder, $ranges) = (/([^:]+)(?::)?(.*)?/);
+	my ($folder, $ranges) = (/^(.*?)(:$ranges_regexp)?$/);
+	$ranges =~ s/^:(.*)$/$1/;
 	my $folder_dir;
 	my @ranges = split(',', $ranges);
 	my @messages = ();
@@ -138,7 +141,8 @@ my $matched = 0;
 
 	$folder_dir = expand_path($folder);
 
-	@messages = grep_folder($folder_dir, $eval_string, @ranges);
+	@messages = grep_folder($folder_dir, $eval_string, 
+				$opt_dupchecktarget, @ranges);
 	if ( @messages ) {
 	    $matched += @messages;
 	    foreach ( @messages ) {
@@ -165,7 +169,7 @@ exit $EXIT_SUCCESS;
 ##
 ##################################################
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

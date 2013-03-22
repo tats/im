@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "impack version 980905(IM100)";
+my $VERSION = "impack version 990905(IM130)";
 
 $Prog = 'impack';
 
@@ -85,9 +85,13 @@ sub impack ($) {
 
     foreach (@paths) {
 	$dst = $_;
-	$dst =~ s|[^/]+$|$msg++|e;
-	if ($_ ne $dst){
-	    im_rename($_, $dst) || die $@;   # XXX
+	if (-f $dst) {
+	    do {
+		$dst =~ s|[^/]+$|$msg++|e;
+	    } while ($_ ne $dst && -e $dst);
+	    if ($_ ne $dst){
+		im_rename($_, $dst) || die $@;   # XXX
+	    }
 	}
     }
 
@@ -95,7 +99,7 @@ sub impack ($) {
     touch_folder($folder) unless $opt_noharm;
 }
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

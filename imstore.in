@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Dec 31, 1995
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imstore version 980905(IM100)";
+my $VERSION = "imstore version 990905(IM130)";
 
 $Prog = 'imstore';
 
@@ -54,7 +54,6 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $opt_help;
 
 debug_option($opt_debug) if $opt_debug;
 
-$opt_noscan = 1;
 &process_stdin();
 
 sub process_stdin () {
@@ -64,7 +63,7 @@ sub process_stdin () {
 	push (@Message, $_);
     }
 
-    &store_message(\@Message, $opt_dst);
+    &store_message(\@Message, $opt_dst, 1);
     &exec_getsbrfile($opt_dst);
 }
 
@@ -102,7 +101,7 @@ Print a usage message on standard output and exit successfully.
 
 =cut
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

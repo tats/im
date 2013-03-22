@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::EncDec.pm version 980905(IM100)";
+my $PM_VERSION = "IM::EncDec.pm version 990905(IM130)";
 
 package IM::EncDec;
 require 5.003;
@@ -60,7 +60,8 @@ MIME header encoder/decoder package.
 use vars qw(@D2H 
 	    $mime_encode_switch
 	    $mime_decode_switch
-	    @Base64a %Base64b);
+	    @Base64a %Base64b
+	    @koi_iso);
 
 ##################################################
 ##
@@ -157,11 +158,9 @@ sub mime_encode_string ($$$) {
 sub mime_decode_string ($) {
     my $in = shift;
     return '' if ($in eq '');
-    if ($in =~ /"/) {
-        if ($in =~ /^([^"]*)("[^"]*")(.*)$/) {
+    if (!$main::opt_mimedecodequoted) {
+        if ($in =~ /^([^"]*)("[^"]*")([\0-\255]*)$/) {
             return mime_decode_string($1) . $2 . mime_decode_string($3);
-        } else {  # unblanced "
-	    return $in;
 	}
     }
     $in =~ s/\?=\s+=\?/?==?/g;
@@ -175,14 +174,22 @@ sub mime_decode($$$) {
     my $ret = &{$$mime_decode_switch{uc($3)}}($4);
     if ($cs =~ /iso-8859-([2-9])/i) {
 	$ret = iso_8859_to_ctext($ret, $1);
-    } elsif ($cs =~ /cn-gb/i) {
+    } elsif ($cs =~ /koi8-r/i) {
+	$ret = koi8r_to_ctext($ret);
+    } elsif ($cs =~ /tis-620/i) {
+	$ret = tis_620_to_ctext($ret);
+    } elsif ($cs =~ /cn-gb/i || $cs =~ /gb2312/i) {
 	$ret = cn_gb_to_ctext($ret);
+    } elsif ($cs =~ /hz-gb-2312/i) {
+	$ret = hz_to_ctext($ret);
     } elsif ($cs =~ /euc-jp/i) {
 	$ret = euc_jp_to_ctext($ret);
     } elsif ($cs =~ /euc-kr/i) {
 	$ret = euc_kr_to_ctext($ret);
     } elsif ($cs =~ /shift_jis/i) {
 	$ret = shift_jis_to_ctext($ret);
+    } elsif ($cs =~ /big5/i || $cs =~ /cn-big5/i) {
+	$ret = big5_to_ctext($ret);
     }
     return $ret;
 }
@@ -194,9 +201,53 @@ sub iso_8859_to_ctext ($$) {
     return $str;
 }
 
+@koi_iso =
+    (" ", " ", " ", " ", " ", " ", " ", " ", 
+     " ", " ", " ", " ", " ", " ", " ", " ", 
+     " ", " ", " ", " ", " ", " ", " ", " ", 
+     " ", " ", " ", " ", " ", " ", " ", " ", 
+     " ", " ", " ", "\xf1", " ", " ", " ", " ", 
+     " ", " ", " ", " ", " ", " ", " ", " ", 
+     " ", " ", " ", "\xa1", " ", " ", " ", " ", 
+     " ", " ", " ", " ", " ", " ", " ", " ", 
+     "\xee", "\xd0", "\xd1", "\xe6", "\xd4", "\xd5", "\xe4", "\xd3",
+     "\xe5", "\xd8", "\xd9", "\xda", "\xdb", "\\", "\xdd", "\xde",
+     "\xdf", "\xef", "\xe0", "\xe1", "\xe2", "\xe3", "\xd6", "\xd2",
+     "\xec", "\xeb", "\xd7", "\xe8", "\xed", "\xe9", "\xe7", "\xea",
+     "\xce", "\xb0", "\xb1", "\xc6", "\xb4", "\xb5", "\xc4", "\xb3",
+     "\xc5", "\xb8", "\xb9", "\xba", "\xbb", "\xbc", "\xbd", "\xbe",
+     "\xbf", "\xcf", "\xc0", "\xc1", "\xc2", "\xc3", "\xb6", "\xb2",
+     "\xcc", "\xcb", "\xb7", "\xc8", "\xcd", "\xc9", "\xc7", "\xca" );
+
+sub koi2iso ($) {
+    my $str = shift;
+    $str =~ s/(.)/$koi_iso[ord($1)-128]/ge;
+    return $str;
+}
+
+sub koi8r_to_ctext($) {
+    my $str = shift;
+    $str =~ s/([\x80-\xff]+)/"\e-L" . koi2iso($1). "\e-A"/ge;
+    return $str;
+}
+
+sub tis_620_to_ctext($) {
+    my ($str) = shift;
+    $str =~ s/([\x80-\xff]+)/\e-T$1\e-A/g;
+    return $str;
+}
+
 sub cn_gb_to_ctext ($) {
     my $str = shift;
     $str =~ s/([\x80-\xff]+)/"\e\$(A" . remove_msb($1) . "\e(B"/ge;
+    return $str;
+}
+
+sub hz_to_ctext($) {
+    my $str = shift;
+    $str =~ s/(~~)/~/g;
+    $str =~ s/(~{)/\e\$(A/g;
+    $str =~ s/(~})/\e(B/g;
     return $str;
 }
 
@@ -258,6 +309,40 @@ sub s2j($) {
 	$ret .= pack('CC', $c1, $c2);
     }
     return $ret;
+}
+
+sub b157to94 ($) {
+    my $str = shift;
+    my ($c1, $c2, $tmp);
+    my $ret = "";
+
+    while ($str) {
+	($c1, $c2, $str) = unpack('CCa*', $str);
+	if ($c1 < 0xc9) {
+	    $tmp = ($c1 - 0xa1) * 157 + $c2;
+	} else {
+	    $tmp = ($c1 - 0xc9) * 157 + $c2;
+	}
+	if ($c2 < 0x7f) {
+	    $tmp -= 0x40;
+	} else {
+	    $tmp -= 0x62;
+	}
+	$c1 = $tmp / 94 + 0x21;
+	$c2 = $tmp % 94 + 0x21;
+	$ret .= pack('CC', $c1, $c2);	
+    }
+    return $ret;
+}
+
+sub big5_to_ctext($) {
+    my $str = shift;
+
+    $str =~ s/([\xa1-\xc6][\x40-\x7e\xa1-\xfe])/"\e\$(0" . 
+	b157to94($1) . "\e(B"/ge;
+    $str =~ s/([\xc9-\xf9][\x40-\x7e\xa1-\xfe])/"\e\$(1" . 
+	b157to94($1) . "\e(B"/ge;
+    return $str;
 }
 
 ##################################################
@@ -331,7 +416,7 @@ sub q_decode_string ($) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

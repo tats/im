@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "impath version 980905(IM100)";
+my $VERSION = "impath version 990905(IM130)";
 
 $Prog = 'impath';
 
@@ -117,11 +117,13 @@ sub show_path () {
     print "InboxFolder=" . inbox_folder() . "\n";
     print "DraftFolder=" . draft_folder() . "\n";
     print "TrashFolder=" . trash_folder() . "\n";
-    print "AliasFile="   . aliases_file() . "\n";
-    print "PetnameFile=" . petname_file() . "\n";
+    print "AddrBookFile=" . addrbook_file() . "\n";
+    print "AliasFile="    . aliases_file() . "\n";
+    print "PetnameFile="  . petname_file() . "\n";
     print "QueuePath=" . queue_path() . "\n";
     print "ImapAccount=" . imapaccount() . "\n";
     print "ConfigCases=" . config_cases() . "\n";
+    print "ConfigCaseInbox=" . config_case_inbox() . "\n";
 }
 
 ##
@@ -149,7 +151,7 @@ sub dig_dir ($$) {
         $child = $rel_dir = "$abs_dir/$_";
         $rel_dir =~ s:$FOLDER_ROOT/*::;
         print "$p$rel_dir\n";
-        dig_dir($child, $p) if win95p() || os2p() || ((stat($child))[3] > 2);
+	dig_dir($child, $p) if win95p() || os2p() || ((stat($child))[3] != 2);
     }
 }
 
@@ -169,7 +171,7 @@ sub impath ($@) {
     }
 }
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

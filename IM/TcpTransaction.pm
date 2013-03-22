@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::TcpTransaction.pm version 980905(IM100)";
+my $PM_VERSION = "IM::TcpTransaction.pm version 990905(IM130)";
 
 package IM::TcpTransaction;
 require 5.003;
@@ -425,7 +425,7 @@ sub alarm_func {
     im_die("connection error\n");
 }
 
-sub inet6_pack_sockaddr_in6 ($;$;$) {
+sub inet6_pack_sockaddr_in6 ($$;$) {
     my ($family, $port, $he_addr) = @_;
 
     if (eval '&AF_INET6') {   # perl supports IPv6
@@ -442,7 +442,7 @@ sub inet6_family () {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

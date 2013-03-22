@@ -1,7 +1,7 @@
 			   Internet Message
 
 			    Kazu Yamamoto
-			     Sep  5, 1998
+			     Sep  5, 1999
 
 			   <<<Copyright>>>
 
@@ -20,8 +20,8 @@ means, in short words, free but no warranty.
 
 	      <<<Installing under the root privilege>>>
 
-* Install Perl 5.004 or later if not installed. For more information,
-see 00perl.
+* Install Perl 5.004_04 or later if not installed. For more
+information, see 00perl. Please note that Perl 5.004 is buggy.
 
 * Execute "configure".
 

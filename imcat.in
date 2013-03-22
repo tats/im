@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: May  5, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imcat version 980905(IM100)";
+my $VERSION = "imcat version 990905(IM130)";
 
 $Prog = 'imcat';
 
@@ -27,7 +27,8 @@ use integer;
 use strict;
 use vars qw($Prog $EXPLANATION @EnvConfig @OptConfig
 	    @servers
-	    $opt_src $opt_join $opt_verbose $opt_debug $opt_help);
+	    $opt_src $opt_join $opt_boundary
+	    $opt_verbose $opt_debug $opt_help);
 
 ##
 ## Environments
@@ -45,11 +46,12 @@ Usage: imcat [options] msg
      );
 
 @OptConfig = (
-    'src;F;;'     => "Folder.",
-    'join;b;;'    => "join partial messages.",
-    'verbose;b;;' => 'With verbose messages.',
-    'debug;d;;'   => "With debug message.",
-    'help;b;;'    => "Show this message.",
+    'src;F;;'      => "Folder.",
+    'join;b;;'     => "join partial messages.",
+    'boundary;b;;' => "Print start boundary for Mew.",
+    'verbose;b;;'  => 'With verbose messages.',
+    'debug;d;;'    => "With debug message.",
+    'help;b;;'     => "Show this message.",
     );
 
 ##
@@ -69,6 +71,7 @@ debug_option($opt_debug) if $opt_debug;
 ##
 
 my $msg = $ARGV[0];
+my $BOUNDARY="---BEGIN-IMGET-MESSAGE---\n";
 
 unless ($msg) {
     im_die("no message specified.\n");
@@ -81,6 +84,7 @@ if ($msg =~ /^http:/i) {
     if ($rc < 0) {
 	im_die("can't access to message $msg.\n");
     }
+    print $BOUNDARY if $opt_boundary;
     foreach (@$data) {
 	print;
     }
@@ -103,6 +107,7 @@ if ($msg =~ /^http:/i) {
 	    exit $EXIT_ERROR;
 	}
 	&join_msg($msg) if ($opt_join);
+	print $BOUNDARY if $opt_boundary;
 	foreach (split(',', $msg)) {
 	    my $path = &expand_path($_);
 	    if (open(MSG, "<$path")) {
@@ -119,6 +124,7 @@ if ($msg =~ /^http:/i) {
     } else {
 	my $path = &message_name($opt_src, $msg);
 	&join_msg($path) if ($opt_join);
+	print $BOUNDARY if $opt_boundary;
 	if (open(MSG, "<$path")) {
 	    while (<MSG>) {
 		print;
@@ -128,29 +134,12 @@ if ($msg =~ /^http:/i) {
 	    im_warn("no message $msg in folder $opt_src.\n");
 	}
     }
-} elsif ($opt_src =~ /^\-(.*)/) {
+} elsif ($opt_src =~ /^-/) {
     # News spool (-group[@server])
-    require IM::Nntp && import IM::Nntp qw(nntp_spec nntp_open nntp_command
-					   nntp_article nntp_close);
-    my ($rc, $art);
-
-    my ($group, $srvs) = nntp_spec($1, nntpservers());
-    local @servers = split(',', $srvs);
-    im_notice("accessing to $group on $srvs.\n");
-    do {
-	if (($rc = nntp_open(\@servers, 0)) < 0) {
-	    im_die("can not connect $srvs.\n");
-	}
-	if (($group ne '') && ($rc = nntp_command("GROUP $group", 1)) < 0) {
-	    im_die("can not access $group.\n");
-	}
-    } while (@servers > 0 && $rc > 0);
-    im_die("can not access $group on $srvs.\n") if ($rc);
-    ($rc, $art) = nntp_article($msg);
-    nntp_close();
-    if ($rc) {
-	im_die("no message $msg in -$group.\n");
-    }
+    require IM::Nntp && import IM::Nntp qw(nntp_get_message);
+    my ($rc, $art) = nntp_get_message($opt_src, $msg);
+    im_die($art) if ($rc < 0);
+    print $BOUNDARY if $opt_boundary;
     foreach (@$art) {
 	print;
     }
@@ -169,27 +158,13 @@ if ($msg =~ /^http:/i) {
 	($folder, $auth, $user, $host) = imap_spec($folder);
     }
 
-    my $pass = '';
-    my $agtfound = 0;
-    my $interact = 0;
-    if (&usepwagent()) {
-	$pass = &loadpass('imap', $auth, $host, $user);
-	$agtfound = 1 if ($pass ne '');
-    }
-    if ($pass eq '' && &usepwfiles()) {
-	$pass = &findpass('imap', $auth, $host, $user);
-    }
-    if ($pass eq '') {
-	$pass = &getpass('Password: ');
-	$interact = 1;
-    }
-
+    my ($pass, $agtfound, $interact) = getpass('imap', $auth, $host, $user);
     im_warn("accessing IMAP/$auth:$user\@$host\n") if (&verbose);
 
     my ($rc, $HANDLE) = &imap_open($auth, $host, $user, $pass);
     if ($rc < 0) {
-	im_warn("IMAP connection was not established.\n")
-	  if (&debug('imap') || &verbose);
+	my $prompt = lc("imap/$auth:$user\@$host");
+	im_err("invalid password ($prompt).\n");
 	&savepass('imap', $auth, $host, $user, '')
 	    if ($agtfound && &usepwagent());
 	exit $EXIT_ERROR;
@@ -208,6 +183,7 @@ if ($msg =~ /^http:/i) {
 	} elsif ($rc > 0) {
 	    im_die("message $msg not found in \%$folder\n");
 	}
+	print $BOUNDARY if $opt_boundary;
 	foreach (@$message) {
 	    print;
 	}
@@ -341,19 +317,32 @@ sub join_msg ($) {
     for ($i = 1; $i <= $#paths; $i++) {
 	if (open(MSG, "<$paths[$i]")) {
 	    $/ = "\n\n";
-	    if ($i == 1) {
-		my $header = <MSG>;
+	    if ($i == 1) {		# first partial message
+		my $header = <MSG>;	# header of enclosing message
 		my $skip = 0;
 		foreach (split("\n", $header)) {
 		    next if (/^[ \t]/ && $skip);
 		    $skip = 0;
-		    if (/^(Content|Message-ID)/i) {
+		    if (/^(Content-|Subject|Message-ID|Encrypted|MIME-Version)/i) {
 			$skip = 1;
 			next;
 		    }
-		    last if (/^\n/);
+		    last if (/^$/);
 		    print "$_\n";
 		}
+		$header = <MSG>;	# header of enclosed message
+		$skip = 0;
+		foreach (split("\n", $header)) {
+		    next if (/^[ \t]/ && $skip);
+		    $skip = 0;
+                    unless (/^(Content-|Subject|Message-ID|Encrypted|MIME-Version)/i || /^[ \t]/) {
+			$skip = 1;
+			next;
+		    }
+		    last if (/^$/);
+		    print "$_\n";
+		}
+		print "\n";
 	    } else {
 		# skip header part
 		<MSG>;
@@ -369,7 +358,7 @@ sub join_msg ($) {
     exit $EXIT_SUCCESS;
 }
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

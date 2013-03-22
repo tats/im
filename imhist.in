@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Jul  6, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imhist version 980905(IM100)";
+my $VERSION = "imhist version 990905(IM130)";
 
 $Prog = 'imhist';
 
@@ -23,7 +23,6 @@ $Prog = 'imhist';
 
 use IM::Config;
 use IM::Address;
-use IM::Header;
 use IM::History;
 use IM::Message;
 use IM::Util;
@@ -198,7 +197,7 @@ sub add_folder_info ($$) {
     }
 }
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

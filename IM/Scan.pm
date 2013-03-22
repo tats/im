@@ -5,19 +5,21 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Scan.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Scan.pm version 990905(IM130)";
 
 package IM::Scan;
 require 5.003;
 require Exporter;
 
-use IM::Config qw(allowcrlf scansbr_file mail_path address addresses_regex);
+use IM::Config qw(allowcrlf scansbr_file scan_header_pick mail_path address
+		  addresses_regex addrbook_file petname_file);
 use IM::Util;
 use IM::EncDec qw(mime_decode_string);
 use IM::Address qw(extract_addr fetch_addr);
+use IM::Japanese;
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -35,7 +37,7 @@ use vars qw(@ISA @EXPORT);
   use IM::Scan;
 
   &set_scan_form($scan_form, $width, $use_jis);
-  &read_petnames($petnames_file);
+  &read_petnames();
   %Head = &get_header($mail_file);
   &disp_msg(\%Head);
 
@@ -234,12 +236,15 @@ sub set_scan_form ($$$) {
 sub get_header ($) {
     my $path = shift;
     my %Head = ();
+    my $folder;
 
     $Head{'path'} = $path;
     if ($path =~ /(.*)\/([0-9]+)$/) {
 	# xxx how about news?
 	$Head{'number:'} = $2;
-	$Head{'folder:'} = '+' . substr($1, length(mail_path()) + 1);
+	$folder = substr($1, length(mail_path()) + 1);
+	$folder = conv_iso2022jp($folder) if ($folder =~ /[\200-\377]/);
+	$Head{'folder:'} = '+' . $folder;
     }
 
     open(MSG, "<$path") || return;
@@ -347,7 +352,7 @@ sub parse_body (*$) {
 	next if /^\s*\n/;
 	next if /^--/;
 	next if /^- --/;
-	next if /^\s+[\w-]+=/;		# "boundary=", etc
+	next if /^\s+[\w-*]+=/;		# eg. "boundary="; * = RFC2231
 	next if /^\s*[\w-]+: /;		# Headers and header style citation
 	next if /^\s*[\w-]*[>|]/;	# other citation
 	next if /:\n$/;
@@ -386,21 +391,15 @@ sub parse_header ($) {
     ##
     ## Thread related
     ##
-    if ($href->{'in-reply-to'}) {
-	if ($href->{'in-reply-to'} =~ /.*(<[^<]*>)\s*/) {
-	    $href->{'in-reply-to:'} = $1;
-	} else {
-	    $href->{'in-reply-to:'} = $href->{'in-reply-to'};
-	}
-    }
-    if ($href->{'references'}) {
+    if (($href->{'in-reply-to'})
+	&& ($href->{'in-reply-to'} =~ /.*(<[^<]*>)\s*/))  {
+	$href->{'references:'} = $1;
+    } elsif ($href->{'references'}) {
 	if ($href->{'references'} =~ /.*(<[^<]*>)/) {
 	    $href->{'references:'} = $1;
 	} else {
 	    $href->{'references:'} = $href->{'references'};
 	}
-    } else {
-	$href->{'references:'} = $href->{'in-reply-to:'};
     }
 
     ##
@@ -560,6 +559,8 @@ sub disp_msg ($;$) {
     $href->{'subject:'} = '' unless defined($href->{'subject:'});
     $href->{'indent-subject:'} = $href->{'indent:'} . $href->{'subject:'};
 
+    binmode(STDOUT);
+
     if (defined &my_get_msg) {
 	print &my_get_msg($href), "\n";
 	flush('STDOUT') unless $main::opt_buffer;
@@ -591,6 +592,7 @@ sub friendly_addr ($$) {
     my $friendly = '';
     my ($a, $f, $p);
     while (($a, $addr, $f) = &fetch_addr($addr, 1), $a ne '') {
+	$a =~ s/\/[^@]*//;
 	if (defined(%petnames) && $petnames{lc($a)}) {
 	    $p = $petnames{lc($a)};
 	} elsif (!$need_addr && $f) {
@@ -622,7 +624,7 @@ sub my_addr (@) {
 	$ADDRESS_HASH{'addr'} = addresses_regex();
 	unless ($ADDRESS_HASH{'addr'}) {
 	    $ADDRESS_HASH{'addr'} = '^' . quotemeta(address()) . '$';
-            $ADDRESS_HASH{'addr'} =~ s/(\\\s)*\\,(\\\s)*/|/g;
+            $ADDRESS_HASH{'addr'} =~ s/(\\\s)*\\,(\\\s)*/\$|\^/g;
 	}
 	    $ADDRESS_HASH{'init'} = 1;
     }
@@ -652,6 +654,15 @@ sub convert_scan_form ($) {
     my @symbols = ();
     my ($format, $jis_safe, $plus, $hyphen, $size, $type, $arg);
 
+    if (scan_header_pick()) {
+	my $elem;
+	foreach $elem (split /,/, scan_header_pick()) {
+	    if ($elem =~ /^([a-zA-Z]+):(.*)$/) {
+		$symbol_table{$1} = "$2";
+	    }
+	}
+    }
+
     while ($SCANFORM ne '') {
 	if ($SCANFORM =~ /^%(!?)(\+?)(-?)(\d*)([a-zA-Z]|{\w+})(.*)/) {
 	    $plus = $2;
@@ -659,6 +670,18 @@ sub convert_scan_form ($) {
 	    $size = $4;
 	    $type = $5;
 	    $SCANFORM = $6;
+
+	    $type =~ s/{(.*)}/$1/;
+	    if ($type eq 'n') {
+		if ($SCANFORM =~ /^ / ||
+		    $SCANFORM =~ /^%D/ || $SCANFORM =~ /^%p/ ||
+		    $SCANFORM =~ /^%M/) {
+		    # OK
+		} else {
+		im_err("Characters in Scan form after %n should be a space or %D or %p or %M\n");
+	        }
+	    }
+
 	    $jis_safe = ($size ne '' && $size > 0
 			 && ($1 ne '' || $NEEDSAFE_HASH{$symbol_table{$type}}))
 		? $JIS_SAFE : 0;
@@ -834,12 +857,63 @@ sub substr_safe ($$) {
 ## Read petnames entry
 ##
 
-sub read_petnames ($) {
-    my $file = shift;
+sub w2n ($) {
+    my $line = shift;
+    $line =~ tr/\x20/\x0/;
+
+    return $line;
+}
+
+sub read_petnames () {
+
+    if (addrbook_file() && open(ADDRBOOK, addrbook_file())) {
+	my $key; my $addr; my $petname; my $a; my @addrs;
+	my $code;
+
+	while(<ADDRBOOK>) {
+	    my $line = '';
+	    do {
+		chomp;
+		next if (/^[\#;]/);
+		$code = code_check($_, 0);
+		if ($code eq 'sjis') {
+		    $_ = conv_euc_from_sjis($_);
+		} elsif ($code eq 'jis') {
+		    $_ = conv_euc_from_jis($_);
+		}
+		s/#.*$//g;
+		$line =~ s/\\$//;
+		$line .= $_;
+	    } while (/[,\\]$/ && defined($_ = <ADDRBOOK>));
+	    $_ = $line;
+	    s/"([^"]+)"/w2n($1)/geo;
+	    s/,\s+/,/g;
+	    if (s/^(\S+)\s+(\S+)\s+(\S+)//) {
+		$key = $1;
+		$addr = $2;
+		$petname = $3;
+		next if ($key =~ /:$/);
+	        next if $petname eq '*';
+	    } else {
+		next;
+	    }
+	    $petname =~ tr/\x0/\x20/;
+            $petname = conv_iso2022jp($petname, 'EUC');
+
+	    @addrs = split(/,\s*/, $addr);
+	    while ($addr = shift(@addrs)) {
+	        $petnames{lc($addr)} = $petname;
+	    }
+	}
+	close(ADDRBOOK);
+	return;
+    }
+    my $file = petname_file();
+    return unless $file;
     unless (open(PETNAMES, $file)) {
 	im_warn("can't open petname file $file\n");
-	return undef;
-    }
+	return;
+    } 
     while(<PETNAMES>) {
 	next if (/^$/);
 	next if (/^#/);
@@ -857,7 +931,7 @@ sub read_petnames ($) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

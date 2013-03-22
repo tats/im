@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::LocalMbox.pm version 980905(IM100)";
+my $PM_VERSION = "IM::LocalMbox.pm version 990905(IM130)";
 
 package IM::LocalMbox;
 require 5.003;
@@ -17,10 +17,10 @@ require Exporter;
 use Fcntl;
 use IM::Config;
 use IM::Util;
-use IM::MsgStore qw(store_message exec_getsbrfile);
+use IM::MsgStore qw(store_message exec_getsbrfile fsync);
 use integer;
 use strict;
-use vars qw(@ISA @EXPORT);
+use vars qw(@ISA @EXPORT $getchk_hook);
 
 @ISA = qw(Exporter);
 @EXPORT = qw(local_get_msg);
@@ -51,8 +51,8 @@ use vars qw($locked_by_file $locked_by_flock);
 # local_get_msg(src, dst, how)
 #		check, from, get
 #
-sub local_get_msg ($$$$) {
-    my ($src, $dst, $how, $lock_type) = @_;
+sub local_get_msg ($$$$$) {
+    my ($src, $dst, $how, $lock_type, $noscan) = @_;
     my ($need_lock, $qmail_ok, $msgs, $l, $file, $p);
     my (@MailDrops);
 
@@ -89,7 +89,7 @@ sub local_get_msg ($$$$) {
 	    push(@MailDrops, $ENV{'MAIL'}) if ($ENV{'MAIL'});
 	    push(@MailDrops, "$home/Maildir");
 	    foreach $p (@MailDrops) {
-		if (( -d $p && -d "$p/new" ) || -f $p ) {
+		if (( -d $p && -d "$p/new" && -d "$p/cur") || -f $p ) {
 		    $mbox = $p;
 		    last;
 		}
@@ -117,48 +117,51 @@ sub local_get_msg ($$$$) {
     }
     im_notice("mailbox for $user is $mbox\n");
 
-    if (-d $mbox) {
-	# DIRECTORY
-	my $qmail_folder = 0;
-	if ($qmail_ok && -d "$mbox/new") {
-	    $mbox = "$mbox/new";
-	    $qmail_folder = 1;
-	}
-	my $msgs = 0;
-	unless (opendir(FLDR, $mbox)) {
-	    im_warn("can't open directory: $mbox\n");
-	    return -1;
-	}
-	im_info("Getting new messages from maildir into $dst....\n")
-	  if ($how eq 'get');
-	if ($qmail_folder) {
-	    my $f;
-	    foreach $f (sort {(-M $b) <=> (-M $a) || $a cmp $b} readdir(FLDR)) {
-		if ($f =~ /^\d+\.\d+\..+/ && -s "$mbox/$f") {
-		    if (&process_file("$mbox/$f", $dst, $how) < 0) {
-			return -1;
-		    }
-		    if ($how eq 'get' && $main::opt_keep == 0) {
-			unlink("$mbox/$f");
-		    }
-		    $msgs++;
+    $getchk_hook = getchksbr_file();
+    if ($getchk_hook) {
+	if ($getchk_hook =~ /^(\S+)$/) {
+	    if ($main::INSECURE) {
+		im_warn("Sorry, GetChkSbr is ignored for SUID root script.\n");
+	    } else {
+		$getchk_hook = $1;    # to pass through taint check
+		if (-f $getchk_hook) {
+		    require $getchk_hook;
+		} else {
+		    im_err("scan subroutine file $getchk_hook not found.\n");
 		}
 	    }
+	}
+    }
+
+    if (-d $mbox) {
+	# DIRECTORY
+	im_info("Getting new messages from maildir into $dst....\n")
+	  if ($how eq 'get');
+
+	my $msgs = 0;
+	if ($qmail_ok && -d "$mbox/new" && -d "$mbox/cur") {
+	    $msgs = process_maildir($mbox, $dst, $how, $noscan);
 	} else {
+	    unless (opendir(FLDR, $mbox)) {
+		im_warn("can't open directory: $mbox\n");
+		return -1;
+	    }
 	    my $f;
 	    foreach $f (sort {$a <=> $b} readdir(FLDR)) {
 		if ($f =~ /^\d+$/ && -s "$mbox/$f") {
-		    if (&process_file("$mbox/$f", $dst, $how) < 0) {
+		    if (process_file("$mbox/$f", $dst, $how, $noscan) < 0) {
 			return -1;
 		    }
 		    if ($how eq 'get' && $main::opt_keep == 0) {
+			$f =~ /(.+)/;	# $f is tainted yet
+			$f = $1;	# clean up
 			unlink("$mbox/$f");
 		    }
 		    $msgs++;
 		}
 	    }
+	    closedir(FLDR);
 	}
-	closedir(FLDR);
 	if ($msgs == 0) {
 	    if ($how eq 'check') {
 		im_msg("no message in local maildir.\n");
@@ -186,12 +189,48 @@ sub local_get_msg ($$$$) {
 		return -1;
 	    }
 	}
-	if (($msgs = &process_mbox($mbox, $dst, $how)) < 0) {
-	    &local_unlockmbox($mbox) if ($need_lock);
-	    return -1;
-	}
-	if ($how eq 'get') {
-	    &local_empty($mbox) unless ($main::opt_keep);
+	if ($how eq 'get' && $getchk_hook ne '' && !$main::opt_keep) {
+	    my $tmpmbox = expand_path('tmp_mbox');
+	    if (local_copymbox($mbox, $tmpmbox) < 0) {
+		return -1;
+	    }
+
+	    unless (open (SAVE, "+>$mbox")) {
+		im_err("can't open $mbox ($!).\n");
+		close(SAVE);
+		return -1;
+	    }
+
+	    if (($msgs = process_mbox($tmpmbox, $dst, $how, $mbox, $noscan)) < 0) {
+		close(SAVE);
+		if (local_copymbox($tmpmbox, $mbox) < 0) {
+		    im_err("write back to $mbox failed. $tmpmbox preserved ($!).\n");
+		} else {
+		    unlink($tmpmbox);
+		}
+		&local_unlockmbox($mbox) if ($need_lock);
+		return -1;
+	    }
+
+	    if (&unixp() && !&no_sync()) {
+		if (fsync(fileno(SAVE)) < 0) {
+		    im_err("write back to $mbox failed ($!).\n");
+		    close(SAVE);
+		    unlink($tmpmbox) if (-z $tmpmbox);
+		    return -1;
+		}
+	    }
+
+	    truncate (SAVE, tell(SAVE));
+	    unlink($tmpmbox);
+	} else {
+	    if (($msgs = process_mbox($mbox, $dst, $how, '', $noscan)) < 0) {
+		&local_unlockmbox($mbox) if ($need_lock);
+		return -1;
+	    }
+	    if ($how eq 'get') {
+		&local_empty($mbox) unless ($main::opt_keep);
+	    }
 	}
 	&local_unlockmbox($mbox) if ($need_lock);
 	return $msgs;
@@ -207,8 +246,79 @@ sub local_get_msg ($$$$) {
     }
 }
 
-sub process_file ($$$) {
-    my ($mbox, $dst, $how) = @_;
+sub local_copymbox ($$) {
+    my ($src, $dst) = @_;
+
+    im_debug("copy from $src to $dst\n") if (&debug('local'));
+    unless (open(SRC, "<$src")) {
+	return -1;
+    }
+    unless (open(DST, "+>$dst")) {
+	return -1;
+    }
+    while (<SRC>) {
+	unless (print DST) {
+	    im_err("writing to $dst failed ($!).\n");
+	    close(DST);
+	    close(SRC);
+	    unlink($dst) if (-z $dst);
+	    return -1;
+	}
+    }
+    if (&unixp() && !&no_sync()) {
+	if (fsync(fileno(DST)) < 0) {
+	    im_err("writing to $dst failed ($!).\n");
+	    close(DST);
+	    close(SRC);
+	    unlink($dst) if (-z $dst);
+	    return -1;
+	}
+    }
+    truncate (DST, -s SRC);
+    close (DST);
+    close (SRC);
+    return 0;
+}
+
+sub process_maildir ($$$$) {
+    my ($maildir, $dst, $how, $noscan) = @_;
+    my ($msgs, $f, $dir);
+
+    unless (-d "$maildir/new" && -r "$maildir/new" && -x "$maildir/new"
+         && -d "$maildir/cur" && -r "$maildir/cur" && -x "$maildir/cur") {
+	im_warn("can't open maildir: $dir\n");
+	return -1;
+    }
+
+    $msgs = 0;
+    foreach $dir ("$maildir/cur", "$maildir/new") {
+	unless (opendir(FLDR, $dir)) {
+	    im_warn("can't open directory: $dir\n");
+	    return -1;
+	}
+	foreach $f (sort {(-M $b) <=> (-M $a) || $a cmp $b} readdir(FLDR)) {
+	    if ($f =~ /^\d+\.\d+\..+/ && -s "$dir/$f") {
+		my $ret = process_file("$dir/$f", $dst, $how, $noscan);
+		next if ($ret > 0);	# skip by rule
+		if ($ret < 0) {
+		    closedir(FLDR);
+		    return -1;
+		}
+		if ($how eq 'get' && $main::opt_keep == 0) {
+		    $f =~ /(.+)/;	# $f is tainted yet
+		    $f = $1;		# clean up
+		    unlink("$dir/$f");
+		}
+		$msgs++;
+	    }
+	}
+	closedir(FLDR);
+    }
+    return $msgs;
+}
+
+sub process_file ($$$$) {
+    my ($mbox, $dst, $how, $noscan) = @_;
     my ($format, $msgs, $rp, $length, $inheader, @Message);
     local (*MBOX);
 
@@ -220,8 +330,15 @@ sub process_file ($$$) {
     while (<MBOX>) {
 	push (@Message, $_);
     }
+    if ($getchk_hook ne '') {
+	my $head = lcl_store_header(\@Message);
+	unless (eval { &getchk_sub($head); }) {
+	    close(MBOX);
+	    return 1
+	}
+    }
     if ($how eq 'get') {
-	if (&store_message(\@Message, $dst) < 0) {
+	if (store_message(\@Message, $dst, $noscan) < 0) {
 	    close(MBOX);
 	    return -1;
 	}
@@ -231,11 +348,11 @@ sub process_file ($$$) {
     return 0;
 }
 
-sub process_mbox ($$$) {
-    my ($mbox, $dst, $how) = @_;
+sub process_mbox ($$$$$) {
+    my ($mbox, $dst, $how, $save, $noscan) = @_;
     my ($format, $msgs, $length, $inheader, @Message);
     local (*MBOX);
-    my ($first_line);
+    my ($first_line, $FIRST_LINE);
 
     im_info("Getting new messages from local mailbox into $dst....\n")
 	if ($how eq 'get');
@@ -247,6 +364,7 @@ sub process_mbox ($$$) {
     chomp($first_line = <MBOX>);
     if ($first_line =~ /^From /) {
 	$format = 'UNIX';
+	$FIRST_LINE = $first_line;
     } elsif ($first_line =~ /^\001\001\001\001$/) {
 	$format = 'MMDF';
     } elsif ($first_line =~ /^BABYL OPTIONS:/) {
@@ -319,13 +437,26 @@ sub process_mbox ($$$) {
 		$length -= length($_) if ($length > 0);
 	    }
 	}
-	$msgs++ if ($#Message >= 0);
 
 	if ($Message[$#Message] eq "\n") {
 	    pop (@Message);
 	}
+
+	if ($getchk_hook) {
+	    my %head;
+	    lcl_store_header(\%head, \@Message);
+	    unless (eval { &getchk_sub(\%head); }) {
+		if (save_message(\@Message, $save, $format, $FIRST_LINE) < 0) {
+		    close(MBOX);
+		    return -1;
+		}
+		next;
+	    }
+	}
+	$msgs++ if ($#Message >= 0);
+
 	if ($how eq 'get') {
-	    if (&store_message(\@Message, $dst) < 0) {
+	    if (store_message(\@Message, $dst, $noscan) < 0) {
 		close(MBOX);
 		return -1;
 	    }
@@ -342,6 +473,58 @@ sub process_mbox ($$$) {
 	&exec_getsbrfile($dst);
     }
     return $msgs;
+}
+
+sub save_message ($$$$) {
+    my ($msg, $save, $mode, $fline) = @_;
+
+    im_debug("saving to $save\n") if (&debug('local'));
+    if ($mode eq 'UNIX') {
+	shift(@$msg);
+	unless (print SAVE "$fline\n") {
+	    im_err("writing to $save failed ($!).\n");
+	    close(SAVE);
+	    return -1;
+	}
+    } elsif ($mode eq 'RMAIL') {
+	if (tell(SAVE) == 0) {
+	    unless (print SAVE "BABYL OPTIONS:\n") {
+		im_err("writing to $save failed ($!).\n");
+		close(SAVE);
+		return -1;
+	    }
+	}
+    } elsif ($mode eq 'MMDF') {
+	if (tell(SAVE) == 0) {
+	    unless (print SAVE "\001\001\001\001\n") {
+		im_err("writing to $save failed ($!).\n");
+		close(SAVE);
+		return -1;
+	    }
+	}
+    }
+    foreach (@$msg) {
+	unless (print SAVE) {
+	    im_err("writing to $save failed ($!).\n");
+	    close(SAVE);
+	    return -1;
+	}
+    }
+    if ($mode eq 'UNIX') {
+	unless (print SAVE "\n") {
+	    im_err("writing to $save failed ($!).\n");
+	    close(SAVE);
+	    return -1;
+	}
+    } elsif ($mode eq 'RMAIL') {
+	unless (print SAVE "*** EOOH ***\n") {
+	    im_err("writing to $save failed ($!).\n");
+	    close(SAVE);
+	    return -1;
+	}
+    } elsif ($mode eq 'MMDF') {
+    }
+    return 0;
 }
 
 sub local_empty ($) {
@@ -369,7 +552,7 @@ sub local_lockmbox ($$) {
     $locked_by_file = 0;
     $locked_by_flock = 0;
     if ($type =~ /file/) {
-#	while (! sysopen(LOCK, "$base.lock", O_RDWR|O_CREAT|O_EXCL)) {
+#	while (! sysopen(LOCK, "$base.lock", O_RDWR()|O_CREAT()|O_EXCL())) {
 #	    if ($retry >= 10) {
 #		im_warn("can't create $base.lock: $!\n");
 #		return -1;
@@ -406,9 +589,11 @@ sub local_lockmbox ($$) {
 	    im_err "can't open $base :$!\n";
 	    return -1;
 	}
+	if (! &win95p ){
 	unless (flock (LOCK_FH, LOCK_EX|LOCK_NB)) {
 	    im_warn "can't flock $base: $!\n";
 	    return -1;
+	}
 	}
 	$locked_by_flock = 1;
     }
@@ -427,15 +612,55 @@ sub local_unlockmbox ($) {
 	$locked_by_file = 0;
     }
     if ($locked_by_flock) {
+        if (! &win95p ){
 	flock(LOCK_FH, LOCK_UN);
+        }
 	$locked_by_flock = 0;
     }
     return $rcode;
 }
 
+sub lcl_store_header ($$) {
+    my ($href, $msg) = @_;
+    my ($line);
+
+    foreach (@$msg) {
+	my $l = $_;
+	chomp($l);
+	last if ($l =~ /^$/);
+	if ($l =~ /^\s/) {
+	    $l =~ s/\s+/ /;
+	    $line .= $l;
+	    next;
+	} else {
+	    lcl_set_line($href, $line);
+	    $line = $l;
+	}
+    }
+    lcl_set_line($href, $line);
+}
+
+sub lcl_set_line ($$) {
+    my ($href, $line) = @_;
+
+    return unless ($line =~ /^([^:]*):\s*(.*)$/);
+    my $label = lc($1);
+    return if ($label eq 'received');
+    if (defined($href->{$label})) {
+#	if ($STRUCTURED_HASH{$label}) {
+#	    $href->{$label} .= ", ";
+#	} else {
+	    $href->{$label} .= "\n\t";
+#	}
+	$href->{$label} .= $2;
+    } else {
+	$href->{$label} = $2;
+    }
+}
+
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

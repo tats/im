@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Address.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Address.pm version 990905(IM130)";
 
 package IM::Address;
 require 5.003;
@@ -104,10 +104,11 @@ sub fetch_addr ($$) {
     my ($addrout, $pureout, $groupsyntax) = ('', '', '');
     my ($friendly1, $friendly2, $c) = ('', '', '');
     my ($inquote, $incomment, $addrquote) = (0, 0, 0);
-    my ($gotpure, $groupcolon) = (0, 0);
+    my ($gotpure, $groupcolon, $route) = (0, 0, 0);
     im_debug("fetch_addr(in): $addrin\n") if (&debug('addr'));
     $FOR_SMTP = (&progname =~ /imput/i) unless (defined($FOR_SMTP));
     $addrin = '' unless (defined($addrin));
+    $route = 1 if ($addrin =~ /^\@/);
     while ($addrin ne '') {
 	if ($addrin =~ /^([^\e"\\()<>:;,]+)(.*)/s) {
 	    $c = $1;
@@ -128,7 +129,8 @@ sub fetch_addr ($$) {
 	    ($c, $addrin) = unpack('a a*', $addrin);
 	}
 
-	last if ($c eq ',' && !$inquote && !$incomment && !$groupcolon);
+	last if ($c eq ',' && !$inquote && !$incomment && !$groupcolon
+	         && !$route);
 	$friendly2 .= $c unless($addrquote);
 	if ($inquote) {
 	    $addrout .= $c;
@@ -171,10 +173,12 @@ sub fetch_addr ($$) {
 	    $pureout = '';
 	    chop($friendly2) unless ($addrquote);
 	    $addrquote++;
+	    $route = 1 if ($addrin =~ /^\@/);
 	} elsif ($c eq '>') {
 	    $gotpure = 1;
 	    $pureout =~ s/^<//;
 	    $addrquote--;
+	    $route = 0;
 	} elsif ($c eq '\\') {
 	    $addrout .= $c;
 	    $pureout .= $c unless ($gotpure);
@@ -197,7 +201,7 @@ sub fetch_addr ($$) {
 		$groupsyntax = 1;
 	    }
 	} elsif ($c eq ',') {
-	    last unless ($groupcolon);
+	    last unless ($groupcolon || $route);
 	}
 	$addrout .= $c;
 	$pureout .= $c unless ($gotpure);
@@ -230,7 +234,7 @@ sub fetch_addr ($$) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

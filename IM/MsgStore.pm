@@ -5,20 +5,21 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::MsgStore.pm version 980905(IM100)";
+my $PM_VERSION = "IM::MsgStore.pm version 990905(IM130)";
 
 package IM::MsgStore;
 require 5.003;
 require Exporter;
 
 use Fcntl;
-use IM::Config qw(getsbr_file msg_mode msgdbfile expand_path no_sync file_attr);
+use IM::Config qw(getsbr_file msg_mode msgdbfile expand_path
+		  inbox_folder no_sync fsync_no file_attr);
 use IM::Util;
 use IM::Folder qw(message_number message_name create_folder touch_folder);
-use IM::Header qw(gen_date);
+use IM::Message qw(gen_date);
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -89,8 +90,8 @@ sub new_message (\*$) {
     return ('', '');
 }
 
-sub store_message ($$) {
-    my ($Msg, $dst) = @_;
+sub store_message ($$;$) {
+    my ($Msg, $dst, $noscan) = @_;
     local *ART;
     require IM::Scan && import IM::Scan qw(store_header parse_header
 					   parse_body disp_msg);
@@ -144,7 +145,7 @@ sub store_message ($$) {
 	my %Head;
 	store_header(\%Head, join('', @Hdr));
 
-	unless ($main::opt_noscan) {
+	unless ($noscan) {
 	    splice(@$Msg, 0, $hcount);
 	    $Head{'body:'} = &parse_body($Msg, 1);
 
@@ -295,6 +296,12 @@ sub excl_create (*$) {
 sub fsync ($) {
     my $fno = shift;
 
+    if (fsync_no()) {
+	# try to use SYS_sync number detected when configure
+	return syscall(fsync_no(), $fno);
+    }
+
+    # otherwise, try to find from header files
     unless (defined($sys_fsync)) {
 	my $inc = 'syscall.ph';		# only for BSDs?
 	my $prefix;
@@ -333,7 +340,7 @@ sub fsync ($) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

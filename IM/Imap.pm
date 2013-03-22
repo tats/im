@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Imap.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Imap.pm version 990905(IM130)";
 
 package IM::Imap;
 require 5.003;
@@ -26,11 +26,10 @@ use vars qw(@ISA @EXPORT);
 
 @ISA = qw(Exporter);
 @EXPORT = qw(
-    imap_open imap_close imap_select imap_head imap_from imap_get imap_put
-    imap_delete imap_copy imap_flags
-    imap_list_folder imap_create_folder imap_delete_folder imap_rename_folder
-    imap_get_msg imap_process imap_spec imap_range2set imap_range2msgs
-    imap_folder_regname imap_folder_name imap_folder_acct imap_scan_folder 
+    imap_open imap_close imap_select imap_head imap_get imap_put imap_delete
+    imap_get_msg imap_spec imap_range2set imap_folder_regname imap_scan_folder 
+    imap_open_folders imap_close_folders imap_get_handle imap_get_message
+    imap_put_message imap_put_file imap_refile imap_delete_message
 );
 
 =head1 NAME
@@ -74,10 +73,8 @@ sub imap_open ($$$$) {
     my $failed = 0;
     if ($auth eq 'LOGIN') {
 	my $pw = $pass;
-	if ($pw =~ / /) {		# if space included
-	    $pw =~ s/([\\"])/\\$1/g;	# escape specials
-	    $pw = "\"$pw\"";		# quote it
-	}
+	$pw =~ s/([\\"])/\\$1/g;	# escape specials
+	$pw = "\"$pw\"";		# quote it
 	$resp = &send_command($HANDLE, "im$seq LOGIN $user $pw",
 	  "im$seq LOGIN $user PASSWORD");
 	while ($resp !~ /^im$seq/) {
@@ -128,7 +125,7 @@ sub imap_open ($$$$) {
     if ($resp !~ /^im$seq OK/) {
 	$errmsg = $resp;
 	$errmsg =~ s/^im$seq\s+NO\s*//i;
-	im_warn($errmsg);
+	im_warn("$errmsg\n");
 	return -1
     }
     return -1 if ($failed);
@@ -517,8 +514,8 @@ sub imap_put ($$$) {
 }
 
 # imap_process(handle, how, host, src, dst, limit)
-sub imap_process ($$$$$$) {
-    my ($HANDLE, $how, $host, $src, $dst, $limit) = @_;
+sub imap_process ($$$$$$$) {
+    my ($HANDLE, $how, $host, $src, $dst, $limit, $noscan) = @_;
     my ($msgs, $count) = (0, 0);
      if (($msgs = &imap_select($HANDLE, $src, 1)) < 0) {
          im_warn("selecting folder $src failed.\n"); 
@@ -556,7 +553,7 @@ sub imap_process ($$$$$$) {
 		}  
 		my ($rc, $message) = &imap_get($HANDLE, $i);
 		return -1 if ($rc < 0);
-		return -1 if (&store_message($message, $dst) < 0);
+		return -1 if (store_message($message, $dst, $noscan) < 0);
 		&exec_getsbrfile($dst);
 		unless ($main::opt_keep) {
  		    if (&imap_delete($HANDLE, $i) < 0) {
@@ -574,82 +571,79 @@ sub imap_process ($$$$$$) {
     return $msgs;
 }
 
-sub imap_get_msg ($$$$) {
-    my ($src, $dst, $how, $limit) = @_;
+sub imap_get_msg ($$$$$) {
+    my ($src, $dst, $how, $limit, $noscan) = @_;
 
     $src =~ s/^imap//i;
 
     my ($folder, $auth, $user, $host) = &imap_spec($src);
     return -1 if ($folder eq '');
 
-    my $pass = '';
-    my $agtfound = 0;
-    my $interact = 0;
-    if (&usepwagent()) {
-	$pass = &loadpass('imap', $auth, $host, $user);
-	$agtfound = 1 if ($pass ne '');
-    }
-    if ($pass eq '' && &usepwfiles()) {
-	$pass = &findpass('imap', $auth, $host, $user);
-    }
-    if ($pass eq '') {
-	$pass = &getpass('Password: ');
-	$interact = 1;
-    }
-
+    my ($pass, $agtfound, $interact) = getpass('imap', $auth, $host, $user);
     im_notice("accessing IMAP/$auth:$user\@$host for $how\n");
     my ($rc, $HANDLE) = &imap_open($auth, $host, $user, $pass);
     if ($rc == 0) {
 	&savepass('imap', $auth, $host, $user, $pass)
 	    if ($pass ne '' && $interact && &usepwagent());
-	my $msgs = &imap_process($HANDLE, $how, $host, $folder, $dst, $limit);
+	my $msgs = imap_process($HANDLE, $how, $host, $folder, $dst, $limit, $noscan);
 	return -1 if ($msgs < 0);
 	&imap_close($HANDLE);
 	return $msgs;
     } else {
-	im_err("IMAP connection was not established.\n");
+	my $prompt = lc("imap/$auth:$user\@$host");
+	im_err("invalid password ($prompt).\n");	
 	&savepass('imap', $auth, $host, $user, '')
 	    if ($agtfound && &usepwagent());
 	return -1;
     }
 }
 
-# IMAP folder (--src=imap[%folder][:user][/auth][@server[/port]])
+# IMAP folder (--src=imap[%folder][//auth][:user][@server[/port]])
 sub imap_spec ($) {
     my $spec = shift;
 
+    if ($spec eq '' || $spec !~ /[:\@]|\/\//) {
+	my $s = imapaccount();
+	if ($s !~ /^[\/\@:]/) {
+	    if ($s =~ /\@/) {
+		$s = ":$s";
+	    } else {
+		$s = "\@$s";
+	    }
+	}
+	if ($spec ne '' && $s =~ /^\/[^\/]/) {
+	    $s = "/$s";
+	}
+	$spec .= $s if ($s ne '');
+    }
+
     my ($folder, $auth, $host) = ('INBOX', 'auth', 'localhost');
     my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || im_getlogin();
-    my $account = imapaccount();
 
-    while ($account ne '') {
-        if ($account =~ /^([^\/\@]+)(.*)/) {
-	    $user = $1;
-	} elsif ($account =~ /^\/([^\/\@]+)(.*)/) {
-	    $auth = $1;
-	} elsif ($account =~ /^\@([^\@]+)(.*)/) {
-	    $host = $1;
-	} else {
-	    im_warn("invalid ImapAccount: $account\n");
-	    return ('', '', '', '');
-	}
-	$account = $2;
-    }
-    while ($spec ne '') {
-	if ($spec =~ /^%([^%:\@]+)(.*)/) {	# XXX
-	    $folder = $1;
-	} elsif ($spec =~ /^:([^%:\/\@]+)(.*)/) {
-	    $user = $1;
-	} elsif ($spec =~ /^\/([^%:\/\@]+)(.*)/) {
-	    $auth = $1;
-	} elsif ($spec =~ /^\@([^%\@]+)(.*)/) {
-	    $host = $1;
-	} else {
-	    im_warn("invalid imap spec: $spec\n");
-	    return ('', '', '', '');
-	}
+    if ($spec =~ /^%(.*)\/(\/.*)/) {
+	$folder = $1;
+	$spec = $2;
+    } elsif ($spec =~ /^%([^%:\@]+)(.*)/) {
+	$folder = $1;
+	$spec = $2;
+    }	
+    if ($spec =~ /^\/(\w+)(.*)/) {
+	$auth = $1;
 	$spec = $2;
     }
+    if ($spec =~ /(.*)\@(.*)/) {
+	$host = $2;
+	$spec = $1;
+    }
+    if ($spec =~ /^:(.*)/) {
+	$user = $1;
+	$spec = '';
+    }
+    if ($spec ne '') {
+	im_warn("invalid imap spec: $spec\n");
+	return ('', '', '', '');
+    }
+
     if ($auth =~ /^auth$/i) {
 	$auth = 'AUTH';
     } elsif ($auth =~ /^login$/i) {
@@ -714,7 +708,7 @@ sub imap_range2msgs ($@) {
     $set = &imap_range2set($HANDLE, @ranges);
     $seq = $ImapSeq++;
     $resp = &send_command($HANDLE, "im$seq UID SEARCH UID $set", '');
-    if ($resp =~ /^\* SEARCH (\d+( +\d+)*)/i) {
+    if ($resp =~ /^\* SEARCH (\d[ \d]*)/i) {
 	@uids = split(' ', $1);
     } else {
 	im_warn("UID SEARCH command failed.\n");
@@ -722,7 +716,7 @@ sub imap_range2msgs ($@) {
     }
     $resp = &next_response($HANDLE);
     return (-1) if ($resp !~ /^im$seq OK/);
-    return @uids;
+    return wantarray ? @uids : $uids[0];
 }
 
 sub imap_folder_regname ($) {
@@ -732,24 +726,30 @@ sub imap_folder_regname ($) {
     ($folder, $auth, $user, $host) = imap_spec($folder);
     $folder =~ s/^/%/;
 
-    return "$folder:$user/$auth\@$host"; # may be appended '/port'
+    return "$folder//$auth:$user\@$host"; # may be appended '/port'
 }
 
 sub imap_folder_name ($) {
     my $folder = shift;
 
     if ($folder =~ /^%([^:\@]+)/) {
-	return $1;		# folder without '%'
+	$folder = $1;
+	if ($folder =~ /(.*)\/\//) {
+	    $folder = $1;
+	}
+	return $folder;		# folder without '%'
     }
     return '';
 }
 
 sub imap_folder_acct ($) {
-    my $folder = shift;
+    my $folder = shift;		# %...
+    my ($auth, $user, $host);
 
-    $folder = imap_folder_regname($folder);
-    if ($folder =~ /^%([^:]+):([^\/]+)\/([^\@]+)\@([^\/]+).*$/) {
-	return "$2\@$4";	# user@host
+    ($folder, $auth, $user, $host) = imap_spec($folder);
+
+    if ($user && $host) {
+	return "$user\@$host";
     }
     return '';
 }
@@ -760,7 +760,7 @@ sub imap_all_uids ($) {
 
     $seq = $ImapSeq++;
     $resp = &send_command($HANDLE, "im$seq UID SEARCH 1:*", '');
-    if ($resp =~ /^\* SEARCH (\d+( +\d+)*)/i) {
+    if ($resp =~ /^\* SEARCH (\d[ \d]*)/i) {
 	@uids = split(' ', $1);
     } else {
 	im_warn("UID SEARCH command failed.\n");
@@ -833,12 +833,12 @@ sub imap_scan_folder ($$@) {
 	$Head{'folder:'} = "\%$folder";
 	parse_header(\%Head);
 
-	if ($main::opt_thread) {
-	    &make_thread(%Head);
-	} else {
+#	if ($main::opt_thread) {
+#	    &make_thread(%Head);
+#	} else {
 	    &disp_msg(\%Head);
 	    $count++;
-	}
+#	}
 	$resp = &next_response($HANDLE);
     }
     if ($resp !~ /^im$seq OK/) {
@@ -848,9 +848,160 @@ sub imap_scan_folder ($$@) {
     return $count;
 }
 
+############################################
+##
+## For immv & imrm
+##
+
+my %ImapHandleCache = ();
+
+sub imap_open_folders ($@) {
+    my ($create, @folders) = @_;
+
+    foreach (@folders) {
+	next unless (/^%/);
+	my $acct = imap_folder_acct($_);
+	my $ifld = imap_folder_name($_);
+	my ($rc, $HANDLE);
+
+	unless ($HANDLE = $ImapHandleCache{$acct}) {
+	    my ($dummy, $auth, $user, $host)
+		= imap_spec(imap_folder_regname($_));
+
+	    my ($pass, $agtfound, $interact) = 
+		getpass('imap', $auth, $host, $user);
+
+	    ($rc, $HANDLE) = imap_open($auth, $host, $user, $pass);
+	    if ($rc < 0) {
+		my $prompt = lc("imap/$auth:$user\@$host");
+		im_err("invalid password ($prompt).\n");
+		savepass('imap', $auth, $host, $user, '')
+		    if ($agtfound && usepwagent());
+		imap_close_folders();
+		return -1;
+	    }
+	    savepass('imap', $auth, $host, $user, $pass)
+		if ($interact && $pass ne '' && usepwagent());
+	    $ImapHandleCache{$acct} = $HANDLE;
+	}
+
+	if ((imap_select($HANDLE, $ifld, 1) < 0) && $create) {
+	    if (imap_create_folder($HANDLE, $ifld) < 0) {
+		im_warn("can't create $_ folder.\n");
+		imap_close_folders();
+		return -1;
+	    }
+	}
+    }
+    return 0;
+}
+
+sub imap_close_folders () {
+    foreach (keys(%ImapHandleCache)) {
+	imap_close($ImapHandleCache{$_});
+    }
+    %ImapHandleCache = ();
+}
+
+sub imap_get_handle ($) {
+    return $ImapHandleCache{imap_folder_acct(shift)};
+}
+
+sub imap_get_message ($$) {
+    my ($src, $range) = @_;
+    my $HANDLE = imap_get_handle($src);
+    my $msg = imap_range2msgs($HANDLE, ($range));
+
+    if ($msg < 0) {
+	im_warn("can't find source message(s).\n");
+	return ();
+    }
+
+    my ($rc, $msgref) = imap_get($HANDLE, $msg);
+    if ($rc < 0) {
+	im_warn("can't get msg $_ from source folder.\n");
+	return ();
+    }
+    return $msgref;
+}
+
+sub imap_put_message ($$;$) {
+    my ($Message, $dsts, $src_path) = @_;
+    my $dst;
+
+    foreach $dst (@$dsts) {
+	my $HANDLE = imap_get_handle($dst);
+	if (imap_put($HANDLE, imap_folder_name($dst), $Message) < 0) {
+	    im_warn("can't store msg $src_path to $dst folder.\n");
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+sub imap_put_file ($$$) {
+    my ($src, $dsts, $src_path) = @_;
+    my @Message;
+    local (*SRC);
+
+    unless (open(SRC, "<$src_path")) {
+	im_warn("can't open local message $src_path.\n");
+	return -1;
+    }
+    local $_;
+    while (<SRC>) {
+	push(@Message, $_);
+    }
+    close(SRC);
+
+    return imap_put_message(\@Message, $dsts, $src_path);
+}
+
+sub imap_refile ($$$) {
+    my ($src, $dsts, $msgs) = @_;
+    my ($HANDLE, $srcacct, $srcset);
+    my $link_1st;
+
+    $srcacct = imap_folder_acct($src);
+    $HANDLE = $ImapHandleCache{$srcacct};
+    if (imap_select($HANDLE, imap_folder_name($src), 1) < 0) {
+	im_warn("can't select $src source folder.\n");
+	imap_close_folders();
+	exit($EXIT_ERROR);
+    }
+    $srcset = imap_range2set($HANDLE, @$msgs);
+
+    for (my $i = 0; $i < @$dsts; $i++) {
+	if (imap_folder_acct($$dsts[$i]) eq $srcacct) {
+	    my $dst = splice(@$dsts, $i, 1); $i--;
+	    if (imap_copy($HANDLE, $srcset, imap_folder_name($dst), 0) < 0) {
+		im_warn("can't copy to $dst folder.\n");
+		return -1;
+	    }
+	}
+    }
+    unless (@$dsts) {
+	imap_delete($HANDLE, $srcset) unless ($main::opt_link);
+	imap_close_folders();
+	return 0;
+    }
+
+    imap_delete($HANDLE, $srcset) unless ($main::opt_link);
+    $msgs = ["$link_1st-last"];
+    return 0;
+}
+
+sub imap_delete_message () {
+    my ($src, $range) = @_;
+    my $HANDLE = imap_get_handle($src);
+    my $srcset = imap_range2set($HANDLE, $range);
+
+    imap_delete($HANDLE, $srcset);
+}
+
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

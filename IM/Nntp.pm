@@ -5,17 +5,17 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Nntp.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Nntp.pm version 990905(IM130)";
 
 package IM::Nntp;
 require 5.003;
 require Exporter;
 
 use Fcntl;
-use IM::Config qw(nntphistoryfile nntpservers nntp_timeout);
+use IM::Config qw(nntphistoryfile nntpservers nntpauthuser nntp_timeout);
 use IM::TcpTransaction;
 use IM::Util;
 use integer;
@@ -32,6 +32,7 @@ use vars qw(@ISA @EXPORT);
     nntp_command
     nntp_command_response
     nntp_next_response
+    nntp_get_message
     nntp_get_msg
     nntp_head_as_string
     nntp_spec
@@ -154,22 +155,7 @@ sub nntp_transact_sub ($$$$$) {
     my $rc;
 
     return $rc if ($rc = &nntp_open($servers, 1));
-    $rc = &tcp_command(\*NNTPd, 'POST', '');
-    return -1 if ($rc < 0);
-    if ($rc > 0) {
-	my ($res) = &command_response();
-	my ($user, $pass) = ('nouser', 'nopass');	# XXX
-	if ($res =~ /^480/) {
-	    # authenticate for posting
-	    return $rc
-	      if ($rc = &tcp_command(\*NNTPd, "AUTHINFO USER $user", ''));
-	    return $rc
-	      if ($rc = &tcp_command(\*NNTPd, "AUTHINFO PASS $pass",
-		'AUTHINFO PASS ********'));
-	} else {
-	    return 1;
-	}
-    }
+    return -1 if (($rc = &nntp_command("POST")) < 0);
 
     select (NNTPd); $| = 0; select (STDOUT);
 
@@ -336,13 +322,13 @@ sub nntp_articles ($$$$) {
     my $last = 0;
 
     my $i;
+    require IM::MsgStore && import IM::MsgStore;
     for ($i = $art_start; $i <= $art_end; $i++) {
 	($rc, $article) = &nntp_article($i);
 	next if ($rc > 0);
 	return -1 if ($rc < 0);
 	$count++;
 
-	require IM::MsgStore && import IM::MsgStore;
 	return -1 if (&store_message($article, $dst) < 0);
 	$last = $i;
 	last if ($limit && --$limit == 0);
@@ -354,8 +340,9 @@ sub nntp_articles ($$$$) {
 sub nntp_list ($) {
     my $group = shift;
     local $_;
+    my $rc;
 
-    my $rc = &tcp_command(\*NNTPd, 'LIST ACTIVE', '');
+    return -1 if (($rc = &nntp_command("LIST ACTIVE")) < 0);
     if ($rc) {
 	im_warn("LIST command failed.\n");
 	return -1;
@@ -372,7 +359,34 @@ sub nntp_list ($) {
 
 sub nntp_command ($) {
     my $cmd = shift;
-    return &tcp_command(\*NNTPd, $cmd, '');
+    my $rc = &tcp_command(\*NNTPd, $cmd, '');
+
+    return -1 if ($rc < 0);
+    if ($rc > 0) {
+	my ($res) = &command_response();
+	if ($res =~ /^480/) {
+	    require IM::GetPass && import IM::GetPass;
+
+#	    print "Username: ";
+#	    my $user = <STDIN>;
+#	    chomp($user);
+	    my $user = &nntpauthuser() || 
+		$ENV{'USER'} || $ENV{'LOGNAME'} || im_getlogin();
+	    my $host = get_cur_server();
+	    my ($pass, $agtfound, $interact)
+		= getpass('nntp', 'PASS', $host, $user);
+
+	    # authenticate for posting
+	    return $rc
+	      if ($rc = &tcp_command(\*NNTPd, "AUTHINFO USER $user", ''));
+	    return $rc
+	      if ($rc = &tcp_command(\*NNTPd, "AUTHINFO PASS $pass",
+		"AUTHINFO PASS " . "*" x length($pass)));
+	    $rc = &tcp_command(\*NNTPd, $cmd, '');
+	    return -1 if ($rc < 0);
+	}
+    }
+    return $rc;
 }
 
 sub nntp_command_response () {
@@ -387,6 +401,9 @@ sub set_last_article_number ($$$) {
     my ($server, $group, $number) = @_;
     my ($pos, $last, $size) = (0, 0, 0);
 
+    if ($server =~ /([^\/]*)\/\d+$/) {
+       $server = $1;
+    }
     my $nntphist = &nntphistoryfile() . '-' . $server;
     if ( -f $nntphist ) {
 	open (NEWSHIST, "+<$nntphist");
@@ -413,7 +430,7 @@ sub set_last_article_number ($$$) {
 	  }
     } else {
 #	open (NEWSHIST, ">$nntphist");
-	sysopen(NEWSHIST, $nntphist, O_RDWR|O_CREAT);
+	sysopen(NEWSHIST, $nntphist, O_RDWR()|O_CREAT());
 	binmode(NEWSHIST);
     }
     seek(NEWSHIST, 0, 2);
@@ -427,6 +444,9 @@ sub get_last_article_number ($$) {
     local $_;
     my $number = 0;
 
+    if ($server =~ /([^\/]*)\/\d+$/) {
+       $server = $1;
+    }
     my $nntphist = &nntphistoryfile() . '-' . $server;
     if (open (NEWSHIST, "<$nntphist")) {
         binmode(NEWSHIST);
@@ -442,6 +462,28 @@ sub get_last_article_number ($$) {
     return $number;
 }
 
+
+sub nntp_get_message ($$) {
+    my ($src, $msg) = @_;
+    my ($rc, $art);
+    my ($group, $srvs) = nntp_spec($src, nntpservers());
+    my @servers = split(',', $srvs);
+    im_notice("accessing to $group on $srvs.\n");
+    do {
+	if (($rc = nntp_open(\@servers, 0)) < 0) {
+	    return (-1, "can not connect $srvs.\n");
+	}
+	if (($group ne '') && ($rc = nntp_command("GROUP $group")) < 0) {
+	    return (-1, "can not access $group.\n");
+	}
+    } while (@servers > 0 && $rc > 0);
+    return (-1, "can not access $group on $srvs.\n") if ($rc);
+    ($rc, $art) = nntp_article($msg);
+    nntp_close();
+    return (-1, "no message $msg in -$group.\n") if ($rc);
+    return (0, $art);
+}
+ 
 # returns number of got articles
 # -1 if error
 sub nntp_get_msg ($$$$) {
@@ -472,7 +514,7 @@ sub nntp_get_msg ($$$$) {
     $error = 0;
     my $i;
     for ($i = 0; $i <= $#resp; $i++) {
-	if ($resp[0] =~ /^211 (\d+) (\d+) (\d+) (.*)$/) {
+	if ($resp[0] =~ /^211 (\d+) (\d+) (\d+) (\S+)/) {
 	    if ($4 ne $group) {
 		# Should not occur
 		$error = 1;
@@ -567,7 +609,9 @@ sub nntp_spec ($$) {
     my ($spec, $server) = @_;
     my $group;
 
-    if ($spec =~ /([^@]*)\@(.*)/) {
+    if ($spec =~ /^-(.*)/) {
+	$group = $1;
+    } elsif ($spec =~ /([^@]*)\@(.*)/) {
 	$group = $1;
 	$server = $2;
     } else {
@@ -578,7 +622,7 @@ sub nntp_spec ($$) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

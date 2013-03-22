@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Jul 6, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::History.pm version 980905(IM100)";
+my $PM_VERSION = "IM::History.pm version 990905(IM130)";
 
 package IM::History;
 require 5.003;
@@ -76,14 +76,14 @@ sub history_open ($) {
 
     my ($db, $fd);
     if ($DBtype eq 'DB') {
-	$db = tie %History, 'DB_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
+	$db = tie %History, 'DB_File', $dbfile, O_CREAT()|O_RDWR(), &msg_mode(0);
     } elsif ($DBtype eq 'NDBM') {
-	$db = tie %History, 'NDBM_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
+	$db = tie %History, 'NDBM_File', $dbfile, O_CREAT()|O_RDWR(), &msg_mode(0);
     } elsif ($DBtype eq 'SDBM') {
 	if (&win95p || &os2p){
-	    $db = tie %History, 'SDBM_File', $dbfile, O_CREAT|O_RDWR|O_BINARY, &msg_mode(0);
+	    $db = tie %History, 'SDBM_File', $dbfile, O_CREAT()|O_RDWR()|O_BINARY(), &msg_mode(0);
 	} else {
-	    $db = tie %History, 'SDBM_File', $dbfile, O_CREAT|O_RDWR, &msg_mode(0);
+	    $db = tie %History, 'SDBM_File', $dbfile, O_CREAT()|O_RDWR(), &msg_mode(0);
 	}
     }
 
@@ -293,7 +293,7 @@ sub history_unlink ($$) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

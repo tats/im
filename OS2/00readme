@@ -4,7 +4,7 @@
                       OKUNISHI Fujikazu
               <fuji0924@mbox.kyoto-inet.or.jp>
 
-                       Sep 02, 1998
+                       Sep 07, 1998
 
 * Install Perl 5.004_03 if not installed.
 
@@ -22,7 +22,7 @@
 	[ configure ] -- shell script
 	 copy OS2\configure.OS2 .
 	 ksh ./configure.OS2 --host=your_host_name
-	 make SHELL=ksh install
+	 make install
 
 	[ Makefile.PL ] -- perl script(ExtUtils::MakeMaker)
 	 perl ./Makefile.PL
@@ -37,6 +37,6 @@
 
 	copy im*.cmd <<BINDIR>>
 
-For more information, see 00readme.
+For more information, see {im-topdir}/00readme.
 
 <<EOF>>

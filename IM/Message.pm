@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Message.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Message.pm version 990905(IM130)";
 
 package IM::Message;
 require 5.003;
@@ -17,7 +17,6 @@ require Exporter;
 use IM::Util;
 use IM::Address qw(extract_addr replace_addr fetch_addr);
 use IM::Alias qw(alias_lookup hosts_completion);
-use IM::Header qw(gen_message_id gen_date header_value add_header hdr_cat);
 use integer;
 use strict;
 use vars qw(@ISA @EXPORT);
@@ -39,6 +38,14 @@ use vars qw(@ISA @EXPORT);
 	put_mimed_error_notify
 	set_crlf
 	crlf
+
+	gen_message_id
+	gen_date
+	header_value
+	add_header
+	kill_header
+	kill_empty_header
+	sort_header
 );
 
 =head1 NAME
@@ -52,7 +59,17 @@ Message - IM Message
 =cut
 
 use vars qw($First_body_line $First_part_mid
-	    $bcc_mid $crlf_char);
+	    $bcc_mid $crlf_char
+	    @Week_str @Month_str $Cur_time
+	    %Mid_hist $Prev_mid_time $Mid_rnd_hist);
+@Week_str = qw(Sun Mon Tue Wed Thu Fri Sat);
+@Month_str = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+
+sub cur_time ($) {
+    my $part = shift;
+    return $Cur_time if ($Cur_time && $part == 0);
+    return $Cur_time = time;
+}
 
 ##### READ HEADER #####
 #
@@ -126,12 +143,12 @@ sub rewrite_header ($) {
     for ($i = 0; $i <= $e; $i++) {
 	$_ = $$Header[$i];
 	if (/^(Resent-)?(To|Cc|Bcc|Dcc):\s*(.*)/is) {
-	    &add_header($Header, 0, " ORIGINAL $1$2: ", $3);
+	    &add_header($Header, 0, " ORIGINAL $1$2", $3);
 	    $val = &rewrite_addr_list($Header, 0, $3, !$main::Obey_MTA_domain);
 	    return -1 if ($val eq '');
 	    $$Header[$i] = "$1$2: $val";
 	} elsif (/^(Resent-)?(From|Reply-To|Errors-To|Return-Receipt-To):\s*(.*)/is) {
-	    &add_header($Header, 0, " ORIGINAL $1$2: ", $3);
+	    &add_header($Header, 0, " ORIGINAL $1$2", $3);
 	    $val = &rewrite_addr_list($Header, 1, $3, !$main::Obey_MTA_domain);
 	    return -1 if ($val eq '');
 	    $$Header[$i] = "$1$2: $val";
@@ -213,7 +230,7 @@ sub rewrite_addr_list ($$$;$) {
 	}
 	$line .= ',' if ($line);
 	im_debug("rewrite: $a => $addr\n") if (&debug('alias'));
-	$line = &hdr_cat($line, $addr, 'any');
+	$line = hdr_cat($line, $addr);
 	$addr_list =~ s/^\s*//;
     }
     return "$line\n";
@@ -251,21 +268,22 @@ sub put_header (*$$$) {
     my ($line, $del, $s);
     my $crlf = &crlf;
 
-    im_debug("entering put_header\n")
+    im_debug("entering put_header ($sel)\n")
       if (&debug('header') || &debug('put'));
-    hdr: foreach $line (@$Header) {
+    hdr: foreach (@$Header) {
+	$line = $_;
 	next if ($line =~ /^ KILLED /);
 	if ($line =~ /^ ORIGINAL /) {
 	    next if ($sel ne 'original');
-	    if ($line =~ /^ ORIGINAL Dcc:/i) {
+	    if ($line =~ /^ ORIGINAL [BDF]cc:/i) {
 		$line =~ s/^ ORIGINAL //;
 	    } else {
 		next;
 	    }
 	}
 	if ($sel =~ /^partial:/) {
-	    if ($line =~ /^(Mime-Version|Message-Id|Encrypted|Lines):/i
-	     || $line =~ /^Content-/i) {
+	    if ($line =~ /^(Subject|Mime-Version|Message-Id|Encrypted|Lines):/i
+	          || $line =~ /^Content-/i) {
 		next if ($sel =~ /:ext$/);
 	    } else {
 		next if ($sel =~ /:int$/);
@@ -295,7 +313,7 @@ sub put_header (*$$$) {
 	$line .= "\n" if ($line !~ /\n$/);
 	$line =~ s/\r?\n/\r\n/g if ($crlf eq "\r\n");
 	im_debug("|$line") if (&debug('header') || &debug('put'));
-	    return -1 unless (print CHAN "$line");
+	return -1 unless (print CHAN "$line");
     }
     if ($proto =~ /nntp/i && !&header_value($Header, 'Path')) {
 #	return -1 unless (print CHAN "Path: $main::Login$crlf");
@@ -422,7 +440,8 @@ sub put_body (*$$$) {
 	$end = $#$Body;
     } else {
 	$start = $main::Lines_to_partial * ($part - 1);
-	$end = $main::Lines_to_partial * $part - 1;
+	$end = $main::Lines_to_partial * $part;
+	$start++ if ($part > 1);
 	$end = $#$Body if ($end > $#$Body);
     }
     im_debug("entering put_body\n") if (&debug('put'));
@@ -530,6 +549,8 @@ sub put_mimed_partial (*$$$$$$) {
 	print CHAN "Message-Id: $main::Cur_mid$crlf";
 	$First_part_mid = $main::Cur_mid if ($part == 1);
     }
+    my $subj = &header_value($Header, 'Subject');
+    print CHAN "Subject: $subj (part $part of $total)$crlf";
     print CHAN "Mime-Version: 1.0$crlf";
     print CHAN "Content-Type: Message/partial;$crlf";
     printf CHAN "\tid=\"%s\"; number=%d; total=%d$crlf",
@@ -693,9 +714,257 @@ sub crlf () {
     $crlf_char;
 }
 
+##### GENERATE A MESSAGE-ID CHARACTER STRING #####
+#
+# gen_message_id(part)
+#	part: part number of partial messages (for reuse)
+#	return value: a unique message-id string
+#
+sub gen_message_id ($) {
+    my $part = shift;
+    return $Mid_hist{$part} if ($part > 0 && $Mid_hist{$part});
+    my ($tm_sec, $tm_min, $tm_hour, $tm_mday, $tm_mon, $tm_year)
+	= localtime(&cur_time($part));
+    my ($mid_time) = sprintf("%d%02d%02d%02d%02d%02d",
+	$tm_year+1900, $tm_mon+1, $tm_mday, $tm_hour, $tm_min, $tm_sec);
+    my ($mid_rnd) = sprintf("%c", 0x41 + rand(26));
+    if ($Prev_mid_time eq $mid_time) {
+	while ($mid_rnd =~ /[$Mid_rnd_hist]/) {
+	    $mid_rnd = sprintf("%c", 0x41 + rand(26));
+	}
+	$Mid_rnd_hist .= $mid_rnd;
+    } else {
+	$Prev_mid_time = $mid_time;
+	$Mid_rnd_hist = $mid_rnd;
+    }
+    if ($main::Message_id_PID) {
+	$mid_rnd = "-".$$.$mid_rnd;
+    }
+    my $mid_user;
+    if ($main::Message_id_UID) {
+	$mid_user = $<;
+    } else {
+	$mid_user = $main::Login;
+    }
+    my ($mid)
+      = "<$mid_time$mid_rnd.$mid_user\@$main::Message_id_domain_name>";
+    $Mid_hist{$part} = $mid if ($part > 0);
+    return $mid;
+}
+
+##### GANARATE A DATE CHARACTER STRING #####
+#
+# gen_date(format)
+#	format:
+#		0 = "DD MMM YYYY HH:MM:SS TZ" (mainly for news)
+#		1 = "WWW, DD MMM YYYY HH:MM:SS TZ"
+#		2 = "WWW MMM DD HH:MM:SS YYYY" (mainly for UNIX From)
+#	return value: date string generated with current time
+#
+sub gen_date ($) {
+    my $format = shift;
+    my ($tm_sec, $tm_min, $tm_hour, $tm_mday, $tm_mon, $tm_year,
+	$tm_wk, $tm_yday, $tm_isdst, $tm_tz);
+    if ($main::NewsGMTdate && $main::News_flag) {
+	($tm_sec, $tm_min, $tm_hour, $tm_mday, $tm_mon, $tm_year,
+	    $tm_wk, $tm_yday) = gmtime(&cur_time(0));
+	$tm_tz = 'GMT';
+    } else {
+	($tm_sec, $tm_min, $tm_hour, $tm_mday, $tm_mon, $tm_year,
+	  $tm_wk, $tm_yday, $tm_isdst) = localtime(&cur_time(0));
+	my $off;
+	if ($ENV{'TZ'} =~ /^([A-Z]+)([-+])?(\d+)(?::(\d\d)(?::\d\d)?)?([A-Z]+)?(?:([-+])?(\d+)(?::(\d\d)(?::\d\d)?)?)?/) {
+	    $tm_tz = $1;
+	    $off = $3 * 60 + $4;
+	    $off = -$off if ($2 ne '-');
+	    if ($tm_isdst && $5 ne '') {
+		$tm_tz = $5;
+		if ($7 ne '') {
+		    $off = $7 * 60 + $8;
+		    $off = -$off if ($6 ne '-');
+		} else {
+		    $off += 60;
+		}
+	    }
+	} else {
+	    my ($gm_sec, $gm_min, $gm_hour, $gm_mday, $gm_mon,
+	      $gm_year, $gm_wk, $gm_yday) = gmtime(&cur_time(0));
+	    $off = ($tm_hour - $gm_hour) * 60 + $tm_min - $gm_min;
+	    if ($tm_year < $gm_year) {
+		$off -= 24 * 60;
+	    } elsif ($tm_year > $gm_year) {
+		$off += 24 * 60;
+	    } elsif ($tm_yday < $gm_yday) {
+		$off -= 24 * 60;
+	    } elsif ($tm_yday > $gm_yday) {
+		$off += 24 * 60;
+	    }
+	}
+	my $tzc = " ($tm_tz)" if ($tm_tz ne '');
+	if ($off == 0) {
+	    $tm_tz = 'GMT';
+	} elsif ($off > 0) {
+	    $tm_tz = sprintf("+%02d%02d%s", $off/60, $off%60, $tzc);
+	} else {
+	    $off = -$off;
+	    $tm_tz = sprintf("-%02d%02d%s", $off/60, $off%60, $tzc);
+	}
+    }
+    if ($format == 0) {
+	return sprintf("%02d %s %d %02d:%02d:%02d %s", $tm_mday,
+	  $Month_str[$tm_mon], $tm_year+1900, $tm_hour, $tm_min,
+	  $tm_sec, $tm_tz);
+    } elsif ($format == 1) {
+	return sprintf("%s, %02d %s %d %02d:%02d:%02d %s", $Week_str[$tm_wk],
+	  $tm_mday, $Month_str[$tm_mon], $tm_year+1900, $tm_hour, $tm_min,
+	  $tm_sec, $tm_tz);
+    } else {
+	return sprintf("%s %s %2d %02d:%02d:%02d %s", $Week_str[$tm_wk],
+	  $Month_str[$tm_mon], $tm_mday, $tm_hour, $tm_min, $tm_sec,
+	  $tm_year+1900);
+    }
+}
+
+##### GET VALUE OF SPECIFIED HEADER LINE #####
+#
+# header_value(header, field)
+#	header: reference to a message header array
+#	field: field name of which value needed
+#	return value: value for specified field OR null
+#
+sub header_value ($$) {
+    my ($Header, $field_name) = @_;
+    my $val;
+    local $_;
+
+    foreach (@$Header) {
+	if (/^$field_name:\s*(.*)/is) {
+	    ($val = $1) =~ s/\s*$//;
+	    return $val;
+	}
+    }
+    return '';
+}
+
+##### ADD A HEADER LINE #####
+#
+# add_header(header, replace_flag, field_name, field_value)
+#	header: reference to a message header array
+#	replace_flag: old headers are deleted if true
+#	field_name: field name to be entered
+#	field_value: field value to be entered with
+#	return value: none
+#
+sub add_header ($$$$) {
+    my ($Header, $replace_flag, $field_name, $field_value) = @_;
+
+    $field_value .= "\n" if ($field_value !~ /\n$/);
+    im_debug("adding header> $field_name: $field_value")
+	if (&debug('header'));
+    if ($replace_flag) {
+	my $i;
+	for ($i = 0; $i <= $#$Header; $i++) {
+	    if ($$Header[$i] =~ /^$field_name:/i) {
+		$$Header[$i] = "$field_name: $field_value";
+		return;
+	    }
+	}
+    }
+    push (@$Header, "$field_name: $field_value");
+}
+
+##### KILL SPECIFIED HEADER LINES #####
+#
+# kill_header(header, field_name, leave_first)
+#	header: reference to a message header array
+#	field_name: field name to be deleted
+#	leave_first: leave the first appeared header line if true
+#	return value: none
+#
+sub kill_header ($$$) {
+    my ($Header, $field_name, $leave_first) = @_;
+
+    my $i;
+    for ($i = 0; $i <= $#$Header; $i++) {
+	if ($$Header[$i] =~ /^$field_name:/i) {
+	    if ($leave_first) {
+		$leave_first = 0;
+		next;
+	    }
+	    im_debug("killing $$Header[$i]") if (&debug('header'));
+	    $$Header[$i] = " KILLED $$Header[$i]";
+	}
+    }
+}
+
+##### KILL EMPTY HEADER LINES #####
+#
+# kill_empty_header(header)
+#	header: reference to a message header array
+#	return value: none
+#
+sub kill_empty_header ($) {
+    my $Header = shift;
+
+    my $i;
+    for ($i = 0; $i <= $#$Header; $i++) {
+	if ($$Header[$i] =~ /^[\w-]+:\s*$/) {
+	    im_debug("killing $$Header[$i]") if (&debug('header'));
+	    $$Header[$i] = " KILLED $$Header[$i]";
+	}
+    }
+}
+
+##### SORT HEADER LINES #####
+#
+# sort_header(header, name_list)
+#	header: reference to a message header array
+#	name_list: leave the first appeared header line if true
+#	return value: none
+#
+sub sort_header ($$) {
+    my ($Header, $name_list) = @_;
+    my ($i, $label, @tail);
+
+    foreach $label (split(',', $name_list)) {
+	for ($i = 0; $i <= $#$Header; ) {
+	    if ($$Header[$i] =~ /^$label:/i) {
+		push (@tail, $$Header[$i]);
+		splice(@$Header, $i, 1);
+	    } else {
+		$i++;
+	    }
+	}
+    }
+    push (@$Header, @tail);
+}
+
+##### HEADER CONCATINATION #####
+#
+# hdr_cat(str1, str2)
+#	str1: a preceeding header string
+#	str2: a header string to be appended to str1
+#	return value: a concatinated header string
+#
+sub hdr_cat ($$) {
+    my ($str1, $str2) = @_;
+
+    if ($str1 eq '' || $str1 =~ /\n[\t ]+$/) {
+	return "$str1$str2";
+    }
+    $str1 =~ /([^\n]*)$/;
+    my $l1 = length($1);
+    $str2 =~ /^([^\n]*)/;
+    my $l2 = length($1);
+    if (!$main::NoFolding && ($l1 + $l2 + 1 > $main::Folding_length)) {
+	return "$str1\n\t$str2";
+    }
+    return "$str1 $str2";
+}
+
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

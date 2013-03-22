@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Iso2022jp.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Iso2022jp.pm version 990905(IM130)";
 
 package IM::Iso2022jp;
 require 5.003;
@@ -16,7 +16,6 @@ require Exporter;
 
 use IM::Util;
 use IM::EncDec qw(b_encode_string q_encode_string);
-use IM::Header qw(hdr_cat);
 use IM::Japanese qw(code_check conv_iso2022jp);
 use integer;
 use strict;
@@ -35,8 +34,13 @@ Iso2022jp - MIME header encoder for ISO-2022-JP character set
 
 =head1 SYNOPSIS
 
-$encoded_string_for_structured_header = &struct_iso2022jp_mimefy(string);
-$encoded_string_for_unstructured_header = &line_iso2022jp_mimefy(string);
+use IM/Iso2022jp;
+
+$encoded_string_for_structured_header = struct_iso2022jp_mimefy(string);
+
+$encoded_string_for_unstructured_header = line_iso2022jp_mimefy(string);
+
+$rcode = header_iso2022jp_conv(\@Header, code_conv_flag);
 
 =head1 DESCRIPTION
 
@@ -48,6 +52,10 @@ use vars qw($Jp_Bin $Jp_Qin $Jp_out
 ($Jp_Bin, $Jp_Qin, $Jp_out) = ('=?ISO-2022-JP?B?', '=?ISO-2022-JP?Q?', '?=');
 ($Jis_kanji, $Jis_roman) = ('\e\$[\@B]', '\e\([BJ]');
 $C_pascii = '[\x21-\x7e]+';
+
+BEGIN {
+    $main::Folding_length = 72 unless (defined($main::Folding_length));
+}
 
 ##### STRUCTURED HEADER LINE ISO-2022-JP MIME CONVERSION #####
 #
@@ -485,9 +493,35 @@ sub header_iso2022jp_conv ($$) {
     return 0;
 }
 
+##### HEADER CONCATINATION #####
+#
+# hdr_cat(str1, str2, space)
+#	str1: a preceeding header string
+#	str2: a header string to be appended to str1
+#	space: separatig space
+#	return value: a concatinated header string
+#
+sub hdr_cat ($$$) {
+    my ($str1, $str2, $space) = @_;
+
+    if ($str1 eq '' || $str1 =~ /\n[\t ]+$/) {
+	return "$str1$space$str2";
+    }
+    $str1 =~ /([^\n]*)$/;
+    my $l1 = length($1);
+    $str2 =~ /^([^\n]*)/;
+    my $l2 = length($1);
+    if (!$main::NoFolding
+	&& ($l1 + length($space) + $l2 + 1 > $main::Folding_length)) {
+	$space = "\t" if ($space eq '');
+	return "$str1\n$space$str2";
+    }
+    return "$str1$space$str2";
+}
+
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

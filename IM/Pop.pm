@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Pop.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Pop.pm version 990905(IM130)";
 
 package IM::Pop;
 require 5.003;
@@ -37,8 +37,7 @@ Pop - POP handling package
 
 =cut
 
-use vars qw(*POPd
-	    %history %newhistory);
+use vars qw(*POPd $SERVER_IDENT %history %newhistory);
 #######################
 # POP access routines #
 #######################
@@ -53,64 +52,71 @@ use vars qw(*POPd
 #	return value:
 #		 0: success
 #		-1: failure
+#		-2: failure (connection)
 #
 sub pop_open ($$$$) {
-    my ($proto, $host, $user, $pass) = @_;
+    my ($auth, $host, $user, $pass) = @_;
+    my $prompt = lc("pop/$auth:$user\@$host");
     my ($resp, $pwd, $errmsg);
     my (@host_list) = ($host);
-    im_notice("opening POP session ($proto)\n");
-    if ($proto eq 'RPOP' && !$main::SUIDROOT) {
+    im_notice("opening POP session ($auth)\n");
+    if ($auth eq 'RPOP' && !$main::SUIDROOT) {
 	im_warn("RPOP operation requires SUID root.\n");
 	return -1;
     }
     &tcp_logging(0);
-    *POPd = &connect_server(\@host_list, 'pop3', ($proto eq 'RPOP')?1:0);
+    *POPd = &connect_server(\@host_list, 'pop3', ($auth eq 'RPOP')?1:0);
     unless ($POPd) {
 	im_warn("connection failed.\n");
-	return -1;
+	return -2;
     }
     $resp = &send_command(\*POPd, '', '');
     if ($resp !~ /^\+/) {
 	im_warn("POP protocol error.\n");
 	return -1;
     }
-    if ($proto eq 'POP') {
+    if ($resp =~ /at ([\w\-.]+) /) {
+	$SERVER_IDENT = "$user\@$1";
+    } else {
+	$SERVER_IDENT = "$user\@unknown";
+    }
+    if ($auth eq 'POP') {
 	$resp = &send_command(\*POPd, "USER $user", '');
 	if ($resp !~ /^\+/) {
-	    im_warn("login failed ($resp).\n");
+	    im_err("login failed ($resp).\n");
 	    return -1;
 	}
 	$resp =  &send_command(\*POPd, "PASS $pass", 'PASS ********');
 	if ($resp !~ /^\+/) {
-	    im_warn("invalid password ($resp).\n");
+	    im_err("invalid password ($prompt) [$resp].\n");
 	    return -1;
 	}
-    } elsif ($proto eq 'RPOP') {
+    } elsif ($auth eq 'RPOP') {
 	$resp = &send_command(\*POPd, "USER $user", '');
 	if ($resp !~ /^\+/) {
-	    im_warn("login failed ($resp).\n");
+	    im_err("login failed ($resp).\n");
 	    return -1;
 	}
 	my $realuser = im_getlogin();
 	$resp =  &send_command(\*POPd, "RPOP $realuser", "");
 	if ($resp !~ /^\+/) {
-	    im_warn("invalid password ($resp).\n");
+	    im_err("invalid password ($prompt) [$resp].\n");
 	    return -1;
 	}
-    } elsif ($proto eq 'APOP') {
+    } elsif ($auth eq 'APOP') {
 	if ($resp !~ /^\+.*(<.+>)/i) {
-	    im_warn("APOP is not supported by the server.\n");
+	    im_err("APOP is not supported by the server.\n");
 	    return -1;
 	}
 	$pwd = &md5_str($1.$pass);
 	$resp =  &send_command(\*POPd, "APOP $user $pwd",
 	  "APOP $user MD5-digest-of-password");
 	if ($resp !~ /^\+/) {
-	    im_warn("Authentication failed ($resp).\n");
+	    im_err("invalid password ($prompt) [$resp].\n");
 	    return -1;
 	}
     } else {
-	im_warn("Unknown Protocol: $proto.\n");
+	im_err("Unknown Protocol: $auth.\n");
 	return -1;
     }
     return 0;
@@ -137,8 +143,8 @@ sub pop_stat () {
     return $field[1];
 }
 
-sub pop_retr ($$) {
-    my ($num, $dst) = @_;
+sub pop_retr ($$$) {
+    my ($num, $dst, $noscan) = @_;
     local ($_);
     my (@Message);
     im_notice("getting message $num.\n");
@@ -165,7 +171,7 @@ sub pop_retr ($$) {
     }
     alarm(0) unless win95p();
 
-    return -1 if (&store_message(\@Message, $dst) < 0);
+    return -1 if (store_message(\@Message, $dst, $noscan) < 0);
     &exec_getsbrfile($dst);
 
     return 0;
@@ -259,8 +265,8 @@ sub pop_uidl ($) {
 }
 
 # pop_process(socket, how)
-sub pop_process ($$$) {
-    my ($how, $host, $dst) = @_;
+sub pop_process ($$$$) {
+    my ($how, $host, $dst, $noscan) = @_;
     my ($histfile, $head, $msgs, $i, $h, $new, $last);
     return -1 if (($msgs = &pop_stat) < 0);
 
@@ -284,6 +290,7 @@ sub pop_process ($$$) {
     $last = 0;
     if ($msgs > 0 && $main::opt_keep != 0) {
 	$histfile = &pophistoryfile();
+	$histfile =~ s/{POPSERVERID}/$SERVER_IDENT/e;
 	if ($histfile eq '') {
 	    im_err("POP historyfile $histfile undefined.\n");
 	    return -1;
@@ -395,8 +402,8 @@ sub pop_process ($$$) {
 	    im_info("no message at $host.\n");
 	}
     } elsif ($how eq 'get') {
-	$new = &pop_inc($msgs, $host, $dst, $last,
-	  $keep_proto, \%history, \@uidl);
+	$new = pop_inc($msgs, $host, $dst, $last,
+		       $keep_proto, \%history, \@uidl, $noscan);
 
 	if ($new > 0 && $main::opt_keep != 0) {
 	    im_notice("writing UIDL history: $histfile\n");
@@ -421,8 +428,8 @@ sub pop_process ($$$) {
     return $new;
 }
 
-sub pop_inc ($$$$$$$) {
-    my ($msgs, $host, $dst, $last, $keep_proto, $histp, $uidlp) = @_;
+sub pop_inc ($$$$$$$$) {
+    my ($msgs, $host, $dst, $last, $keep_proto, $histp, $uidlp, $noscan) = @_;
     my ($accesstime, $i, $h, $head);
     my $got = 0;
     my $ttl = 0;
@@ -439,14 +446,27 @@ sub pop_inc ($$$$$$$) {
     }
     $accesstime = time;
 
+    my $getchk_hook = getchksbr_file();
+    if ($getchk_hook) {
+	if ($getchk_hook =~ /^(\S+)$/) {
+	    if ($main::INSECURE) {
+		im_warn("Sorry, GetChkSbr is ignored for SUID root script.\n");
+	    } else {
+		$getchk_hook = $1;    # to pass through taint check
+		if (-f $getchk_hook) {
+		    require $getchk_hook;
+		} else {
+		    im_err("scan subroutine file $getchk_hook not found.\n");
+		}
+	    }
+	}
+    }
+
     im_info("Getting new messages into $dst....\n");
     for ($i = $last; $i <= $msgs; $i++) {
-	if ($main::opt_ignorepostpet) {
+	if ($getchk_hook ne '') {
 	    $head = &pop_head($i);
-	    if ($head->{'x-mailer'} =~ /PostPet/i
-	     && $head->{'content-type'} =~ /multipart.+kiritorisen/i) {
-		next;
-	    }
+            next unless (eval { &getchk_sub($head); });
 	}
 	if ($main::opt_keep != 0) {
 	    if ($keep_proto eq 'UIDL') {
@@ -467,7 +487,7 @@ sub pop_inc ($$$$$$$) {
 		}
 		$$histp{$$uidlp[$i]} = $accesstime;
 	    } elsif ($keep_proto eq 'STATUS' || $keep_proto eq 'MSGID') {
-		$head = &pop_head($i) unless ($main::opt_ignorepostpet);
+		$head = &pop_head($i) if ($getchk_hook eq '');
 		my $mid = $head->{'message-id'};
 		next if ($mid eq '');
 		$mid =~ s/.*<(.*)>.*/$1/;
@@ -490,7 +510,7 @@ sub pop_inc ($$$$$$$) {
 #		# XXX everything will be kept
 	    }
 	}
-	return -1 if (&pop_retr($i, $dst) < 0);
+	return -1 if (pop_retr($i, $dst, $noscan) < 0);
 	$got++;
 	if ($main::opt_keep == 0) {
 	    # delete current message
@@ -506,29 +526,16 @@ sub pop_inc ($$$$$$$) {
     return $got;
 }
 
-sub pop_get_msg ($$$) {
-    my ($src, $dst, $how) = @_;
+sub pop_get_msg ($$$$) {
+    my ($src, $dst, $how, $noscan) = @_;
 
     $src =~ s/^pop//i;
 
     my ($auth, $user, $host) = &pop_spec($src);
 
-    my $pass = '';
-    my $agtfound = 0;
-    my $interact = 0;
-    unless ($auth eq 'RPOP') {
-	if (&usepwagent()) {
-	    $pass = &loadpass('pop', $auth, $host, $user);
-	    $agtfound = 1 if ($pass ne '');
-	}
-	if ($pass eq '' && &usepwfiles()) {
-	    $pass = &findpass('pop', $auth, $host, $user);
-	}
-	if ($pass eq '') {
-	    $pass = &getpass('Password: ');
-	    $interact = 1;
-	}
-    }
+    my ($pass, $agtfound, $interact) = ('', 0, 0);
+    ($pass, $agtfound, $interact) = 
+	getpass ('pop', $auth, $host, $user) unless $auth eq 'RPOP';
 
     my $msgs = 0;
     im_notice("accessing POP/$auth:$user\@$host for $how\n");
@@ -536,24 +543,26 @@ sub pop_get_msg ($$$) {
     unless ($rc) {
 	&savepass('pop', $auth, $host, $user, $pass)
 	    if ($auth ne 'RPOP' && $interact && $pass ne '' && &usepwagent());
-	$msgs = &pop_process($how, $host, $dst);
+	$msgs = pop_process($how, $host, $dst, $noscan);
 	if ($msgs < 0) {
 	    im_warn("POP processing error.\n");
 	}
 	&pop_close();
-    } else {
+    } elsif ($rc == -1) {
 	im_err("POP connection was not established.\n");
 	&savepass('pop', $auth, $host, $user, '')
 	    if ($auth ne 'RPOP' && $agtfound && &usepwagent());
+    } else {
+	im_err("POP connection was not established.\n");
     }
     return $msgs;
 }
 
-# POP folder (--src=pop[:user][/auth][@server[/port]])
+# POP folder (--src=pop[//auth][:user][@server[/port]])
 sub pop_spec ($) {
     my $spec = shift;
 
-    if ($spec eq '') {
+    if ($spec eq '' || $spec !~ /[:\@]|\/\//) {
 	my $s = popaccount();
 	if ($s !~ /^[\/\@:]/) {
 	    if ($s =~ /\@/) {
@@ -562,23 +571,26 @@ sub pop_spec ($) {
 		$s = "\@$s";
 	    }
 	}
-	$spec = $s if ($s ne '');
+	$spec .= $s if ($s ne '');
     }
     my ($auth, $host) = ('apop', 'localhost');
     my $user = $ENV{'USER'} || $ENV{'LOGNAME'} || im_getlogin();
 
-    while ($spec ne '') {
-	if ($spec =~ /^:([^:\/\@]+)(.*)/) {
-	    $user = $1;
-	} elsif ($spec =~ /^\/([^:\/\@]+)(.*)/) {
-	    $auth = $1;
-	} elsif ($spec =~ /^\@([^\@]+)(.*)/) {
-	    $host = $1;
-	} else {
-	    im_warn("invalid pop spec: $spec\n");
-	    return ('', '', '');
-	}
+    if ($spec =~ /^\/\/?(\w+)(.*)/) {
+	$auth = $1;
 	$spec = $2;
+    }
+    if ($spec =~ /(.*)\@(.*)/) {
+	$host = $2;
+	$spec = $1;
+    }
+    if ($spec =~ /^:(.*)/) {
+	$user = $1;
+	$spec = '';
+    }
+    if ($spec ne '') {
+	im_warn("invalid pop spec: $spec\n");
+	return ('', '', '');
     }
 
     if ($auth =~ /^pop$/i) {
@@ -597,7 +609,7 @@ sub pop_spec ($) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

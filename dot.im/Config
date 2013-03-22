@@ -30,6 +30,7 @@ Address=_login_name_@_your_domain_,_login_name2_@_your_domain2_
 FromDomain=_domain_of_your_mail_address_
 ToDomain=_domain_when_domain_part_is_omitted_
 #Name=Full Name			# commentary name for my mail address
+				# should not contain 8bit characters
 #AddrRegex=
 #Org=The Mew Organization	# for news posting
 #User=user_name
@@ -62,6 +63,8 @@ ToDomain=_domain_when_domain_part_is_omitted_
 ## Default settings
 ##
 
+## Address Book
+#AddrBookFile=Addrbook		# relative to ~/.im/
 ## Mail address aliases
 #AliasesFile=Aliases		# relative to ~/.im/
 ## PetName: mail address aliases for displaying
@@ -72,6 +75,7 @@ ToDomain=_domain_when_domain_part_is_omitted_
 #MsgDBType=DB			# type of database (DB, NDBM, SDBM)
 
 ## To call user defined subroutines (relative to ~/.im/)
+#GetChkSbr=getchk.sbr		# hooks for imget
 #GetSbr=get.sbr			# hooks for imget
 #ScanSbr=scan.sbr		# hooks for imget/imls
 
@@ -81,7 +85,7 @@ ToDomain=_domain_when_domain_part_is_omitted_
 
 ## imget/imls specific
 #ScanSbr=scan.sbr		# hook for special processing (rel. to ~/.im/)
-#Form=%+5n %m%d %-14A %-18S %b	# default format for scanning
+#Form=%+5n %m%d %-14A %S || %b	# default format for scanning
 #AllowCRLF=no			# saved messages may contain CRLF (DOS style)
 #Width=80			# default width for scanning
 #JisSafe=on			# escape seq. of JIS char. should be managed
@@ -97,28 +101,30 @@ ToDomain=_domain_when_domain_part_is_omitted_
 #Imget.Src=local		# default source of imget (local mailbox)
 #lock=flock			# locking style of local mailbox
 #rpath=append			# conversion of UNIX From into Return-Path:
-#PopHistory=pophist		# to save last state (relative to ~/.im/)
+#PopHistory=pophist-{POPSERVERID}	# to save last state (relative to ~/.im/)
 #NntpHistory=newshist		# to save last state (relative to ~/.im/)
 #MBoxStyle=qmail		# if folder style mbox of qmail is used
 #Imget.Src=local:${HOME}/MailDir# in case of qmail
 #UseCL=no			# Use value of Content-Length header
 #NoSync=no			# Do not need fsync(2) on writing file
 
+#Imget.Src=pop
 #PopAccount=/APOP@localhost	# account info for POP access
-#PopAccount=user/APOP@host	# account info with user name
-#PopAccount=user/APOP@host/110	# account info with user name and port number
-#Keep=7		 		# preserve read messages on server
+#PopAccount=/APOP:user@host	# account info with user name
+#PopAccount=/APOP:user@host/110	# account info with user name and port number
+#Keep=7				# preserve read messages on server
 #ProtoKeep=UIDL			# how to know which message is unread
 				# (UIDL, LAST, STATUS, MSGID)
 #IgnorePostPet=yes		# leave messages for PostPet on mbox (POP only)
 
+#Imget.Src=imap
 #ImapAccount=/AUTH@localhost	# account info for IMAP access
-#ImapAccount=user/AUTH@host	# account info with user name
+#ImapAccount=/AUTH:user@host	# account info with user name
 #HttpProxy=proxy-server:8080	# proxy server for HTTP access
 #NoProxy=http://.*my.domain/	# URL regex not to use Proxy server
 #UsePwAgent=yes			# use password agent
 #PwAgentPort=6543		# Port to connect pwagent with TCP/IP
-                                # (Insecure for multi-user system!)
+				# (Insecure for multi-user system!)
 				# 0 to use UNIX domain socket (more secure)
 
 # be careful on security if you wish to use PwFiles!

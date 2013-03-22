@@ -5,10 +5,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 30, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::GetPass.pm version 980905(IM100)";
+my $PM_VERSION = "IM::GetPass.pm version 990905(IM130)";
 
 package IM::GetPass;
 require 5.003;
@@ -21,21 +21,43 @@ use strict;
 use vars qw(@ISA @EXPORT);
 
 @ISA = qw(Exporter);
-@EXPORT = qw(getpass loadpass savepass connect_agent talk_agent findpass);
+@EXPORT = qw(getpass getpass_interact
+	     loadpass savepass connect_agent talk_agent findpass);
 
 =head1 NAME
 
 GetPass - Get password from tty or ...
 
 =head1 SYNOPSIS
-
-$password = &getpass(prompt_string);
+    
+($pass, $agtfound, $interact) = getpass('imap', $auth, $host, $user);
 
 =head1 DESCRIPTION
 
 =cut
 
-sub getpass ($) {
+sub getpass ($$$$) {
+    my($proto, $auth, $host, $user) = @_;
+    my $pass = '';
+    my $agtfound = 0;
+    my $interact = 0;
+
+    if (&usepwagent()) {
+	$pass = &loadpass($proto, $auth, $host, $user);
+	$agtfound = 1 if ($pass ne '');
+    }
+    if ($pass eq '' && &usepwfiles()) {
+	$pass = &findpass($proto, $auth, $host, $user);
+    }
+    my $prompt = lc("$proto/$auth:$user\@$host");
+    if ($pass eq '') {
+	$pass = &getpass_interact("Password ($prompt): ");
+	$interact = 1;
+    }
+    return ($pass, $agtfound, $interact);
+}
+
+sub getpass_interact ($) {
     my ($prompt) = @_;
     my ($secret, $termios, $c_lflag);
 
@@ -62,6 +84,7 @@ sub getpass ($) {
     flush('STDERR');
     chomp($secret = <STDIN>);
     print STDERR "\n";
+    flush('STDERR');
 
     if (! -t STDIN) {
 	# no operation
@@ -218,7 +241,7 @@ sub findpass($$$$) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

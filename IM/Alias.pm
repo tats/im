@@ -5,16 +5,16 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
-my $PM_VERSION = "IM::Alias.pm version 980905(IM100)";
+my $PM_VERSION = "IM::Alias.pm version 990905(IM130)";
 
 package IM::Alias;
 require 5.003;
 require Exporter;
 
-use IM::Config qw(expand_path);
+use IM::Config qw(expand_path aliases_file addrbook_file);
 use IM::Util;
 use integer;
 use strict;
@@ -32,7 +32,7 @@ Alias - mail and host alias looking up package
 
   use IM::Alias;
 
-  alias_read(mail_alias_files);
+  alias_read(mail_alias_files, addrbook_files);
   $result = alias_lookup(user_name);
   alias_print(alias);
 
@@ -42,7 +42,7 @@ Alias - mail and host alias looking up package
 
 =head1 DESCRIPTION
 
-  alias_read("$HOME/.im/Aliases");
+  alias_read("$HOME/.im/Aliases", "$HOME/.im/Addrbook");
   hosts_read("$HOME/.hostaliases");
 
   $result = alias_lookup('u');
@@ -60,17 +60,34 @@ use vars qw(%MAIL_ALIAS_HASH %MAIL_ALIASES %HOST_ALIASES);
 
 ##### READ MAIL ALIAS FILES #####
 #
-# alias_read($mail_aliases_files)
+# alias_read($mail_aliases_files, $addrbook_files)
 #
 #	return value: none
 #
-sub alias_read (;$) {
-    my @aliases = split(',', shift || '~/.im/Aliases');
+sub alias_read (;$$) {
+    my @olds = split(',', shift || aliases_file());
+    my @news = split(',', shift || addrbook_file());
+    my $usenew = 0;
+    my @aliases;
     my $ali;
 
+    foreach $ali (@news) {
+	$ali = expand_path($ali);
+	if (-r $ali) {
+	    $usenew = 1;
+	    last;
+	 }
+    }
+    
+    if ($usenew == 1) {
+	@aliases = @news;
+    } else {
+	@aliases = @olds;
+    }
+ 
     %MAIL_ALIASES = ();
     %MAIL_ALIAS_HASH = ();
-    foreach $ali (@aliases) {
+    ALI: foreach $ali (@aliases) {
 	$ali = expand_path($ali);
 
 	if ($MAIL_ALIAS_HASH{$ali}) {
@@ -89,26 +106,38 @@ sub alias_read (;$) {
 	my $line;
 	while (defined($line = <ALIAS>)) {
 	    next if ($line =~ /^[\#;]/);
+	    # xxx Mew allows # in the middle of line.
+	    # because of non-ASCII, IM can't support it
 	    next if ($line =~ /^\s*$/);
 	    chomp($line);
 	    if ($line =~ /^<\s*(\S+)$/) {
 		push(@aliases, $1);
 		next;
 	    }
-	    while ($line =~ /^(.*\S)\s*\\$/) {
-		my $cont;
-		$line = $1;
-		unless (defined($cont = <ALIAS>)) {
-		    im_warn("EOF encountered on the entry: $line.\n");
-		    next;
-		}
-		chomp($cont);
-		$cont =~ s/^\s*/ /;
-		$line .= $cont;
-	    }
 	    $line =~ s/^\s+//;
-	    my ($name, $val) = split('\s*[:=]\s*', $line, 2);
-	    $MAIL_ALIASES{$name} = $val if $val;
+	    if ($line =~ /^\S+[:=]/) {
+		my $cont;
+		while ($line =~ /\\$/) {
+		    chop($line);
+		    unless (defined($cont = <ALIAS>)) {
+			im_warn("EOF encountered on the entry: $line.\n");
+			next ALI;
+		    }
+		    chomp($cont);
+		    $cont =~ s/^\s*/ /;
+		    $line .= $cont;
+		}
+		my ($name, $val) = split('\s*[:=]\s*', $line, 2);
+		$MAIL_ALIASES{$name} = $val if $val;
+	    } else {
+		#personal info. Skip continuous lines.
+		while ($line =~ /\\$/) {
+		    $line = <ALIAS>;
+		    unless (defined($line)) {
+			next ALI;
+		    }
+		}
+	    }
 	}
 	close(ALIAS);
     }
@@ -258,7 +287,7 @@ sub hosts_print (;$) {
 
 1;
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

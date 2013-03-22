@@ -4,11 +4,10 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Apr 23, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 SHELL=	/bin/sh
-srcdir=	@srcdir@
 
 INSTALL=@INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -36,7 +35,7 @@ moddir=	  $(perldir)/IM
 
 RPOP=	@im_rpop@
 
-PROG =	imali imcat imcd imclean imgrep imhist imjoin imls immv \
+PROG =	imali imcat imcd imclean imgrep imhist imhsync imjoin imls immv \
 	impack impath imput impwagent imrm imsetup imsort imstore \
 	imtar
 
@@ -70,9 +69,9 @@ installdata::
 	$(chmod) 755 $(imlibdir)
 	for cnf_im in SiteConfig ; do \
 		if test ! -f $(imlibdir)/$$cnf_im; then \
-			$(INSTALL_DATA) $(srcdir)/cnf.im/$$cnf_im $(imlibdir); \
+			$(INSTALL_DATA) cnf.im/$$cnf_im $(imlibdir); \
 		else \
-			$(INSTALL_DATA) $(srcdir)/cnf.im/$$cnf_im $(imlibdir)/$$cnf_im.new; \
+			$(INSTALL_DATA) cnf.im/$$cnf_im $(imlibdir)/$$cnf_im.new; \
 		fi ;\
 	done
 
@@ -84,7 +83,7 @@ clean::
 distclean:: clean
 	$(rm) -f Makefile config.log config.status config.cache
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

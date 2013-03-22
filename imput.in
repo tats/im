@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Aug 31, 1995
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "imput version 980905(IM100)";
+my $VERSION = "imput version 990905(IM130)";
 
 $Prog = 'imput';
 
@@ -46,7 +46,6 @@ use IM::Alias;
 use IM::Config;
 use IM::Folder qw(touch_folder);
 use IM::GetPass;
-use IM::Header;
 use IM::History;
 use IM::Iso2022jp;
 use IM::Japanese;
@@ -190,6 +189,8 @@ Usage: $Prog [options] msg
 	=> 'Generate Lines header line.',
     'AliasesFile;s;;Mail_aliases'	# XXX
 	=> 'List of files for mail address aliasing.',
+    'Addrbook;s;;addrbooks'
+	=> 'List of Addrbook files.',
     'HostAliases;s;;Host_aliases'	# XXX
 	=> 'List of files for domain part completion.',
     'FccPartial;b;;Fcc_partial'
@@ -218,6 +219,8 @@ Usage: $Prog [options] msg
 	=> 'Generate PGP signature for body-part.',
     'MultipartAdd;s@;;Mulipart_messages'
 	=> 'Path/name of message to be added as a part of multipart message.',
+    'FilenameAdd;b;;Filename_Add'
+	=> 'Add filename field at Content-Disposition header.',
     'SMTP;b;;Smtp_input_mode'
 	=> 'Perform SMTP style input mode.',
     'Annotate;b;;Anno_flag'
@@ -325,7 +328,7 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 	exit $EXIT_SUCCESS;
     }
 
-    alias_read($Mail_aliases);
+    alias_read($Mail_aliases, $addrbooks);
     hosts_read($Host_aliases);
 
     if ($Draft_message eq '' && $#arg_rest == 0 && $arg_rest[0] !~ /\@/ &&
@@ -399,7 +402,7 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 	    $error = 1 if (set_selector($selector) < 0);
 	}
 	&kill_header(\@Header, 'Config', 0);
-	alias_read($Mail_aliases);
+	alias_read($Mail_aliases, $addrbooks);
 	hosts_read($Host_aliases);
     }
 
@@ -407,8 +410,8 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 
     my ($h);
     foreach $h (@Add_headers) {
-	if ($h =~ /^([\w\-]+):\s*/) {
-	    &add_header(\@Header, 0, $1, $');
+	if ($h =~ /^([\w\-]+):\s*(.*)/s) {
+	    &add_header(\@Header, 0, $1, $2);
 	}
     }
 
@@ -418,8 +421,23 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
 	&kill_header(\@Header, 'Return-Receipt-To', 0);
     }
 
+    # Resent-*: checking
+    if ($Newsgroups eq ''
+     && (($Dist_flag && $Dist_file)
+      || ($Obey_header
+       && (&header_value(\@Header, 'Resent-To')
+        || &header_value(\@Header, 'Resent-Cc'))))) {
+	$resend_mode = 1;
+	$Resend_prefix = 'Resent-';
+	$News_flag = 0;
+	im_notice("NNTP disabled (resend is only for mailing).\n");
+    } else {
+	$resend_mode = 0;
+	$Resend_prefix = '';
+    }
+
     # verify invalid headers for posting news
-    if ($Newsgroups ne '') {
+    if ($resend_mode == 0 && $Newsgroups ne '') {
 	&add_header(\@Header, 1, 'Newsgroups', $Newsgroups);
 	&kill_header(\@Header, 'Path', 0);
 	&kill_header(\@Header, 'Followup-To', 0);
@@ -448,20 +466,6 @@ help($EXPLANATION) && exit $EXIT_SUCCESS if $Help;
     } else {
 	$News_flag = 0;
 	im_notice("NNTP disabled (header format is not fit).\n");
-    }
-
-    if ($Dist_flag
-#    || &header_value(\@Header, 'Date')
-     || &header_value(\@Header, 'Resent-To')
-     || &header_value(\@Header, 'Resent-Cc')
-     || &header_value(\@Header, 'Resent-From')) {
-	$resend_mode = 1;
-	$Resend_prefix = 'Resent-';
-	$News_flag = 0;
-	im_notice("NNTP disabled (resend is only for mailing).\n");
-    } else {
-	$resend_mode = 0;
-	$Resend_prefix = '';
     }
 
     if ($Dist_flag && $Dist_file) {
@@ -955,12 +959,12 @@ sub send_message {
      && !&header_value(\@Header, 'Apparently-To')) {
 	unless ($Show_Rcpts_Header) {
 	    &add_header(\@Header, 0, 'To', 'undisclosed-recipients:;');
-	} else {
-	    foreach $rec (@Recipients) {
-		if ($rec =~ /<(.+)>/) {
-		    &add_header(\@Header, 0, 'To', $1);
-		}
-	    }
+#	} else {
+#	    foreach $rec (@Recipients) {
+#		if ($rec =~ /<(.+)>/) {
+#		    &add_header(\@Header, 0, 'To', $1);
+#		}
+#	    }
 	}
     }
 
@@ -1290,6 +1294,11 @@ sub add_multipart {
 		push(@Body, "Content-Transfer-Encoding: $part_encoding\n");
 	    }
 	}
+	if ($Filename_Add) {
+	    ($mp_msg_name = $mp_msg) =~ s/^.*\///;
+	    push(@Body, "Content-Disposition: attachment; " .
+		 "filename=$mp_msg_name\n");
+	}
 	push(@Body, "\n");
 	push(@Body, @Part);
     }
@@ -1384,7 +1393,7 @@ sub pgp_process {
 	close('WriteHandle1');
 
 	# passphrase required by child process
-	local($phrase) = &getpass('PGP passphrase: ');
+	local($phrase) = &getpass_intract('PGP passphrase: ');
 	print WritePassPhrase "$phrase\n";
 	# get the result
 
@@ -1441,7 +1450,7 @@ sub save_fcc {
 	    unlink($err_remove) if ($err_remove);
 	    return '';
 	}
-	if (&put_header($FCC, \@Header, 'original') < 0
+	if (&put_header($FCC, \@Header, 'internal', 'original') < 0
 	 || &put_body($FCC, \@Body, 0, 0) < 0) {
 	    im_err("FCC write failed ($!).\n");
 	    close($FCC);
@@ -1597,7 +1606,11 @@ sub annotate {
     history_close();
     return -1 if ($msg eq '');
     my $first = "$label: Date: " . &gen_date(1) . "\n";
-    my $second = "$label: To: " . join(',', @Recipients) . "\n";
+    my $second = '';
+    $second = "$label: To: " . join(',', @Recipients) . "\n"
+	unless ($#Recipients < 0);
+    $second .= "$label: Newsgroups: $Newsgroups\n"
+	if ($Newsgroups ne '');
     $second .= "$label: Message-Id: $Cur_mid\n" if ($Cur_mid ne '');
     EACH: foreach (split(',', $msg)) {
 	im_notice("annotating $_.\n");
@@ -1618,6 +1631,7 @@ sub annotate {
 	binmode(ORIGINAL);
 	print TMP $first . $second;
 	my $checked = 0;
+	my $inheader = 1;
 	while (<ORIGINAL>) {
 	    # check first line
 	    unless ($checked) {
@@ -1631,6 +1645,18 @@ sub annotate {
 		    next EACH;
 		}
 		$checked = 1;
+	    }
+	    $inheader = 0 if ($inheader && /^\r?\n$/);
+	    if ($inheader && /^Message-Id:\s*(<.*>)/i) {
+		if ($ref ne $1) {
+		    im_debug("message-id mismatch.\n")
+		      if (&debug('anno'));
+		    # Message-ID mismatch
+		    close(ORIGINAL);
+		    close(TMP);
+		    unlink($tmp);
+		    next EACH;
+		}
 	    }
 	    unless (print TMP $_) {
 		im_err("anno: write failed: $tmp ($!).\n");
@@ -1729,11 +1755,13 @@ sub process_queue {
     foreach $q (sort {$a <=> $b} readdir(QUEUEDIR)) {
 	next unless ($q =~ /^\d+$/);
 #	$QUEUE = 'QUEUE';
-	unless (open(QUEUE, "<$queue_dir/$q")) {
-	    im_err("can't open $queue_dir/$q\n");
+	rename ("$queue_dir/$q", "$queue_dir/$q.wrk");
+	unless (open(QUEUE, "<$queue_dir/$q.wrk")) {
+	    im_err("can't open $queue_dir/$q.wrk\n");
+	    rename ("$queue_dir/$q.wrk", "$queue_dir/$q");
 	    return;
 	}
-	im_notice("processing $queue_dir/$q ...\n");
+	im_notice("processing $queue_dir/$q.wrk ...\n");
 	while (<QUEUE>) {
 	    chomp;
 	    last if (/^$/);
@@ -1764,17 +1792,19 @@ sub process_queue {
 	    im_debug("sending message\n") if (&debug('queue'));
 	    $rcode = &send_message($News_flag, $partial_total);
 	    if ($rcode == 0) {
-		unlink("$queue_dir/$q");
+		unlink("$queue_dir/$q.wrk");
 		im_info("$queue_dir/$q: sent\n");
 	    } elsif ($rcode > 0) {
+		rename ("$queue_dir/$q.wrk", "$queue_dir/$q");
 		im_info("$queue_dir/$q: preserved\n");
 	    } else {
-		unlink("$queue_dir/$q");
+		unlink("$queue_dir/$q.wrk");
 		im_warn("$queue_dir/$q: delivery failed\n");
 		&error_report;
 	    }
 	} else {
 	    my ($r, $t);
+	    rename ("$queue_dir/$q.wrk", "$queue_dir/$q");
 	    print "Message queued in $queue_dir/$q";
 	    if ($Config_opt ne '') {
 		print " (Config: $Config_opt)\n";
@@ -1842,6 +1872,7 @@ sub queue_message {
     }
     $max = 0;
     foreach $q (readdir(QUEUEDIR)) {
+	$q =~ s/\.wrk$//;
 	if ($q =~ /^\d+$/) {
 	    $max = $q if ($max < $q);
 	}
@@ -1876,7 +1907,7 @@ sub queue_message {
     print QUEUE "\n";
 
     &set_crlf("\n");
-    if (&put_header(\*QUEUE, \@Header, 'all') < 0
+    if (&put_header(\*QUEUE, \@Header, 'internal', 'all') < 0
       || &put_body(\*QUEUE, \@Body, 0, 0) < 0) {
 	close(QUEUE);
 	im_err("queuing to $queue_dir/$max failed ($!).\n");
@@ -2048,7 +2079,7 @@ sub exit_ {
 # @HOSTNAME@
 # sgid mail
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without

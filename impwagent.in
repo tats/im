@@ -5,7 +5,7 @@
 ###
 ### Author:  Internet Message Group <img@mew.org>
 ### Created: Sep 13, 1997
-### Revised: Sep  5, 1998
+### Revised: Sep 05, 1999
 ###
 
 BEGIN {
@@ -13,7 +13,7 @@ BEGIN {
     @im_src_siteperl@
 };
 
-my $VERSION = "impwagent version 980905(IM100)";
+my $VERSION = "impwagent version 990905(IM130)";
 
 $Prog = 'impwagent';
 
@@ -36,7 +36,7 @@ init_opt(\@OptConfig);
 read_cfg();
 
 # server termination
-if ($ARGV[0] =~ /quit/i) {
+if ($ARGV[0] =~ /stop|quit/i) {
     $res = &connect_agent(1);
     $res = &talk_agent("QUIT\n") if ($res ne '');
     if ($res eq '') {
@@ -59,14 +59,14 @@ if ($ARGV[0] =~ /clear/i) {
     exit 0;
 }
 
-if ($ARGV[0] =~ /help/i || @ARGV > 0) {
+if ($ARGV[0] !~ /start/i && @ARGV > 0) {
     print <<EOF;
 $Prog: IM Password Agent -- hold passwords to reuse on later sessions.
 
 Usage:
 	$Prog help		show this message
-	$Prog		start $Prog
-	$Prog quit		terminate $Prog
+	$Prog [start]	start $Prog
+	$Prog stop/quit	terminate $Prog
 	$Prog clear		clear passwords held by $Prog
 
 If you wish to use the feature supplied by $Prog, put "UsePwAgent=yes"
@@ -222,7 +222,7 @@ sub alarm_func {
 #   no operation
 }
 
-### Copyright (C) 1997, 1998 IM developing team.
+### Copyright (C) 1997, 1998, 1999 IM developing team
 ### All rights reserved.
 ### 
 ### Redistribution and use in source and binary forms, with or without
