@@ -576,7 +576,7 @@ sub set_value_cfg($$$) {
     my($name, $val, $case) = @_;
     my($mnam, $desc, $vnam);
 
-    $val =~ s/\${(\w+)}/$ENV{$1}/ge;
+    $val =~ s/\$\{(\w+)\}/$ENV{$1}/ge;
     if ($val =~ /^\$(.*)/) {
 	# $InboxFolder -> +inbox
 	$val = ${$C_VNAM{lc($1)}};

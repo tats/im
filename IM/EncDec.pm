@@ -217,8 +217,8 @@ sub cn_gb_to_ctext($) {
 sub hz_to_ctext($) {
     my $str = shift;
     $str =~ s/(~~)/~/g;
-    $str =~ s/(~{)/\e\$(A/g;
-    $str =~ s/(~})/\e(B/g;
+    $str =~ s/(~\{)/\e\$(A/g;
+    $str =~ s/(~\})/\e(B/g;
     return $str;
 }
 
