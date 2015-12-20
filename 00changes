@@ -1,3 +1,9 @@
+152 (2015/12/20)
+
+* Fix unescaped left brace in regex is deprecated for Perl 5.22
+* Update config.guess and config.sub with autotools-dev 20150820.1
+* Add gitlog2imchanges to easily generate 00changes
+
 151 (2011/05/25)
 
 * IM/Config.pm.in, IM/Scan.pm: Don't use defined(%hash) for Perl 5.12.

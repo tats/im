@@ -8,7 +8,7 @@
 ### Revised: Apr 23, 2007
 ###
 
-my $PM_VERSION = "IM::Grep.pm version 20110525(IM151)";
+my $PM_VERSION = "IM::Grep.pm version 20151220(IM152)";
 
 package IM::Grep;
 require 5.003;

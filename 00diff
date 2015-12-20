@@ -1,3 +1,8 @@
+		Differences between IM 152 and IM 151
+
+* Prevent warnings for Perl 5.22
+* Update config.guess and config.sub
+
 		Differences between IM 151 and IM 150
 
 * Tiny changes for Perl 5.12.
