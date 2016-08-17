@@ -39,7 +39,7 @@ use vars qw(@ISA @EXPORT);
     msgdbfile msgdbtype
     mbox_style mbox_filter
     nntpservers nntphistoryfile nntpauthuser set_nntpauthuser
-    popaccount pophistoryfile imapaccount httpproxy noproxy
+    popaccount pophistoryfile imapaccount smtpaccount httpproxy noproxy
     usepwagent pwagentport pwagent_tmp_dir pwagent_tmp_path usepwfiles pwfiles
     expand_path use_xdispatcher usetouchfile touchfile
     namazuv2 namazu_dir namazu_path namazu_lock_dir namazu_lock_path
@@ -135,6 +135,7 @@ BEGIN {
     'popaccount;s;;POPaccount'		=> 'Account info for POP access',
     'pophistory;s;;POPhistory'		=> 'Status file of POP access',
     'imapaccount;s;;IMAPaccount'	=> 'Account info for IMAP access',
+    'smtpaccount;s;;SMTPaccount'	=> 'Account info for SMTP authentication',
     'httpproxy;s;;HTTPproxy'		=> 'Proxy server for HTTP access',
     'noproxy;s;;Noproxy'		=> 'URL regex not to use Proxy server',
     'usepwagent;b;;UsePwAgent'		=> 'Use password agent',
@@ -907,6 +908,10 @@ sub imapaccount() {
     return $IMAPaccount;
 }
 
+sub smtpaccount() {
+    return $SMTPaccount;
+}
+
 sub httpproxy() {
     return $HTTPproxy;
 }
@@ -1163,7 +1168,7 @@ address addresses_regex
 msgdbfile msgdbtype
 mbox_style mbox_filter
 nntpservers nntphistoryfile nntpauthuser set_nntpauthuser
-popaccount pophistoryfile imapaccount httpproxy noproxy
+popaccount pophistoryfile imapaccount smtpaccount httpproxy noproxy
 usepwagent pwagentport pwagent_tmp_dir pwagent_tmp_path usepwfiles pwfiles
 expand_path use_xdispatcher usetouchfile touchfile
 namazuv2 namazu_dir namazu_path namazu_lock_dir namazu_lock_path
