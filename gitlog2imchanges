@@ -79,7 +79,7 @@ while (<>) {
 	if ($author && $date) {
 	    &print_entry;
 	}
-	if (/\((tag: v\d[^\)]+)\)$/) {
+	if (/\((tag: v\d[^\),]+)[^\)]*\)$/) {
 	    $version = $1;
 	    $version =~ s/tag: v//g;
 	}
