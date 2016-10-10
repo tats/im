@@ -8,7 +8,7 @@
 ### Revised: Feb 15, 2010
 ###
 
-my $PM_VERSION = "IM::EncDec.pm version 20151220(IM152)";
+my $PM_VERSION = "IM::EncDec.pm version 20161010(IM153)";
 
 package IM::EncDec;
 require 5.003;

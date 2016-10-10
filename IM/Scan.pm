@@ -8,7 +8,7 @@
 ### Revised: May 25, 2011
 ###
 
-my $PM_VERSION = "IM::Scan.pm version 20151220(IM152)";
+my $PM_VERSION = "IM::Scan.pm version 20161010(IM153)";
 
 package IM::Scan;
 require 5.003;
