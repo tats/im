@@ -339,7 +339,7 @@ sub MD5_Encode($$$) {
 # a multiple of 4.
 
 sub MD5_Decode($$$) {
-    my($output, $input, my $len) = @_;
+    my($output, $input, $len) = @_;
     my($i, $j);
 
     for ($i = 0, $j = 0; $j < $len; $i++, $j += 4) {
